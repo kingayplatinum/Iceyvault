@@ -26,6 +26,7 @@ export default function Home() {
   const [country, setCountry] = useState("All countries");
   const [query, setQuery] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
   const filtered = useMemo(() => offers.filter((offer) => {
     const categoryMatch = category === "All services" || offer.category === category;
     const countryMatch = country === "All countries" || offer.country === country;
@@ -98,13 +99,26 @@ export default function Home() {
               <div className="offer-card-head"><span className="country-flag">{offer.flag}</span><span className="availability-pill"><span /> Supplier check pending</span></div>
               <div className="offer-country">{offer.country}</div><h3>{offer.service}</h3><p>{offer.detail}</p>
               <div className="offer-card-bottom"><div><small>PRICE</small><b>Quote pending</b></div><span className="offer-type">{offer.kind}</span></div>
-              <button className="offer-action" onClick={() => document.getElementById("account")?.scrollIntoView({ behavior: "smooth" })}>View service <ArrowRight size={15} /></button>
+              <button className="offer-action" onClick={() => setSelectedOffer(offer)}>View service <ArrowRight size={15} /></button>
             </article>)}
             {filtered.length === 0 && <div className="empty-state"><Search size={22} /><b>No matching services</b><span>Try another search or clear your filters.</span><button onClick={() => { setCategory("All services"); setCountry("All countries"); setQuery(""); }}>Clear filters</button></div>}
           </div>
           <div className="catalog-note"><ShieldCheck size={17} /><span><b>Transparent availability.</b> We only display live prices and stock after a supplier check. No guessed prices or misleading availability.</span></div>
         </div>
       </section>
+
+      {selectedOffer && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedOffer(null); }}>
+        <section className="service-modal" role="dialog" aria-modal="true" aria-labelledby="service-modal-title">
+          <button className="modal-close" aria-label="Close service details" onClick={() => setSelectedOffer(null)}><X size={18} /></button>
+          <span className="country-flag">{selectedOffer.flag}</span>
+          <div className="eyebrow"><span className="eyebrow-line" /> SERVICE DETAILS</div>
+          <h2 id="service-modal-title">{selectedOffer.service}</h2>
+          <p className="modal-country">{selectedOffer.country} · {selectedOffer.kind}</p>
+          <div className="modal-info"><div><small>COUNTRY</small><b>{selectedOffer.country}</b></div><div><small>SERVICE TYPE</small><b>{selectedOffer.kind}</b></div><div><small>PRICE</small><b>Quote pending</b></div><div><small>AVAILABILITY</small><b>Supplier check pending</b></div></div>
+          <p className="modal-disclaimer">We’ll show the confirmed price, number type, validity and current stock before checkout. This preview does not reserve a number or initiate a purchase.</p>
+          <button className="button modal-button" onClick={() => setSelectedOffer(null)}>Got it <Check size={16} /></button>
+        </section>
+      </div>}
 
       <section className="steps-section" id="how"><div className="section-wrap"><div className="center-heading"><div className="eyebrow"><span className="eyebrow-line" /> HOW IT WORKS</div><h2>Everything in three simple steps.</h2><p>A straightforward experience from choosing a service to managing your activity.</p></div>
         <div className="steps-grid"><article className="step-card"><span className="step-number">01</span><div className="step-icon"><Globe2 size={22} /></div><h3>Choose your service</h3><p>Browse available countries, platforms and number options in one organised catalogue.</p></article><article className="step-card"><span className="step-number">02</span><div className="step-icon"><Wallet size={22} /></div><h3>Fund your wallet</h3><p>When payments are enabled, add NGN funds through the supported checkout options.</p></article><article className="step-card"><span className="step-number">03</span><div className="step-icon"><Smartphone size={22} /></div><h3>Manage your activity</h3><p>Keep track of eligible orders, number status and messages from your account dashboard.</p></article></div>
