@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import {
-  ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpRight, Bell, CircleHelp,
+  ArrowDownToLine, ArrowRight, ArrowUpRight, Bell, CircleHelp,
   Clock3, CreditCard, LayoutDashboard, LifeBuoy, LockKeyhole, Menu,
   MessageCircle, Plus, Settings, ShieldCheck, Smartphone, Wallet, X,
 } from "lucide-react";
