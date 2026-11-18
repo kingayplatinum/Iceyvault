@@ -5,7 +5,7 @@ import { useState } from "react";
 import {
   ArrowDownToLine, ArrowRight, ArrowUpRight, Bell, CircleHelp,
   Clock3, CreditCard, LayoutDashboard, LifeBuoy, LockKeyhole, Menu,
-  MessageCircle, Plus, Settings, ShieldCheck, Smartphone, Wallet, X,
+  MessageCircle, Plus, Settings, ShieldCheck, Smartphone, Wallet,
 } from "lucide-react";
 import "./dashboard.css";
 
@@ -49,7 +49,7 @@ export default function DashboardPage() {
           </div>
           <div className="dash-grid">
             <section className="dash-panel dash-wallet-panel"><div className="dash-panel-head"><div><h2>Wallet activity</h2><p>Recent account transactions</p></div><a href="#coming-soon">View all <ArrowUpRight size={14}/></a></div><div className="dash-empty"><div className="dash-empty-icon"><CreditCard size={21}/></div><b>No transactions yet</b><span>Your verified wallet activity will appear here once payments are connected.</span></div></section>
-            <section className="dash-panel dash-quick-panel"><div className="dash-panel-head"><div><h2>Quick actions</h2><p>Common things you can do</p></div></div><a href="/#services" className="dash-quick-action"><span className="quick-icon purple"><Plus size={17}/></span><span><b>Browse number services</b><small>Explore countries and platforms</small></span><ArrowRight size={15}/></a><div className="dash-quick-action disabled"><span className="quick-icon mint"><ArrowDownToLine size={17}/></span><span><b>Add funds</b><small>Available when wallet is enabled</small></span><LockKeyhole size={14}/></div><div className="dash-quick-action disabled"><span className="quick-icon blue"><MessageCircle size={17}/></span><span><b>View messages</b><small>Provider inbox not connected</small></span><LockKeyhole size={14}/></div></section>
+            <section className="dash-panel dash-quick-panel"><div className="dash-panel-head"><div><h2>Quick actions</h2><p>Common things you can do</p></div></div><Link href="/#services" className="dash-quick-action"><span className="quick-icon purple"><Plus size={17}/></span><span><b>Browse number services</b><small>Explore countries and platforms</small></span><ArrowRight size={15}/></a><div className="dash-quick-action disabled"><span className="quick-icon mint"><ArrowDownToLine size={17}/></span><span><b>Add funds</b><small>Available when wallet is enabled</small></span><LockKeyhole size={14}/></div><div className="dash-quick-action disabled"><span className="quick-icon blue"><MessageCircle size={17}/></span><span><b>View messages</b><small>Provider inbox not connected</small></span><LockKeyhole size={14}/></div></section>
           </div>
           <section className="dash-panel dash-orders-panel"><div className="dash-panel-head"><div><h2>Recent orders</h2><p>Track your latest number activations and rentals</p></div><span className="dash-muted-label">NO LIVE DATA</span></div><div className="dash-table-head"><span>ORDER</span><span>SERVICE</span><span>STATUS</span><span>DATE</span><span>AMOUNT</span></div><div className="dash-order-empty"><Smartphone size={18}/> Your orders will appear here when account services are active.</div></section>
           <footer className="dash-footer"><span>© {new Date().getFullYear()} IceyVault</span><span><ShieldCheck size={13}/> Secure account workspace · Preview mode</span><a href="mailto:support@iceyvault.com"><CircleHelp size={13}/> Need help?</a></footer>
