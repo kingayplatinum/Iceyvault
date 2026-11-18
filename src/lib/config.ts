@@ -1,0 +1,1 @@
+export const appConfig={name:"IceyVault",currency:"NGN",demoMode:!process.env.NEXT_PUBLIC_SUPABASE_URL||!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY} as const;export const formatNaira=(kobo:number)=>new Intl.NumberFormat("en-NG",{style:"currency",currency:"NGN"}).format(kobo/100);
