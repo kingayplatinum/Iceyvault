@@ -47,8 +47,8 @@ export default function Home() {
             <a href="#help" onClick={() => setMobileOpen(false)}>Help</a>
           </nav>
           <div className="nav-actions">
-            <a className="login-link" href="#account">Log in</a>
-            <a className="button button-small" href="#account">Create account <ArrowRight size={15} /></a>
+            <a className="login-link" href="/account">Log in</a>
+            <a className="button button-small" href="/account">Create account <ArrowRight size={15} /></a>
           </div>
           <button className="mobile-menu" aria-label="Toggle navigation" onClick={() => setMobileOpen(!mobileOpen)}>{mobileOpen ? <X /> : <Menu />}</button>
         </div>
@@ -70,7 +70,7 @@ export default function Home() {
               <div className="vault-card-top"><div className="vault-symbol"><LockKeyhole size={18} /></div><span className="live-label"><span /> ACCOUNT PREVIEW</span></div>
               <div className="balance-label">Your wallet balance</div><div className="balance-amount">₦0<span>.00</span></div>
               <div className="balance-caption">NGN · Demo view until account setup</div>
-              <div className="wallet-actions"><a href="#account"><ArrowDownToLine size={17} /><span>Add funds</span></a><a href="#account"><ArrowUpRight size={17} /><span>Transactions</span></a></div>
+              <div className="wallet-actions"><a href="/account"><ArrowDownToLine size={17} /><span>Add funds</span></a><a href="/dashboard"><ArrowUpRight size={17} /><span>Transactions</span></a></div>
               <div className="vault-divider" />
               <div className="activity-row"><div className="activity-icon"><MessageCircle size={17} /></div><div><b>Number activity</b><small>Your orders will appear here</small></div><span className="activity-empty">—</span></div>
               <div className="card-foot"><ShieldCheck size={14} /> Your account activity, in one place</div>
