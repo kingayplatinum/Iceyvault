@@ -4,7 +4,7 @@ export const dynamic="force-dynamic";
 export async function GET(){
  const access=await requireAdmin();if("response" in access)return access.response;const db=access.db;
  const [customers,wallets,customerRows,orders,payments,paidTotals,products,providers,refunds,recentOrders,recentPayments,providerRows,productRows,refundRows,auditRows,syncRows]=await Promise.all([
- db.from("profiles").select("id",{count:"exact",head:true}),db.from("wallets").select("balance_kobo"),db.from("profiles").select("id,display_name,phone_e164,country_code,created_at").order("created_at",{ascending:false}).limit(100),
+ db.from("profiles").select("id",{count:"exact",head:true}),db.from("wallets").select("user_id,balance_kobo"),db.from("profiles").select("id,display_name,phone_e164,country_code,created_at").order("created_at",{ascending:false}).limit(100),
  db.from("orders").select("id",{count:"exact",head:true}),db.from("payment_transactions").select("id",{count:"exact",head:true}),db.from("payment_transactions").select("amount_kobo,status").eq("status","successful"),
  db.from("provider_products").select("id",{count:"exact",head:true}),db.from("providers").select("id,status"),
  db.from("refunds").select("id,status"),db.from("orders").select("id,status,retail_amount_kobo,created_at,user_id,offer_kind").order("created_at",{ascending:false}).limit(12),
