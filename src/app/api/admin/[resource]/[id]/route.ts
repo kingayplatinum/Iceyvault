@@ -8,7 +8,7 @@ export async function PATCH(request:Request,{params}:{params:Promise<{resource:s
  const {db,user,role}=access;
  if(resource==="providers"){
   if(role!=="super_admin")return NextResponse.json({error:"Only a super administrator may change supplier operating status."},{status:403});
-  if(typeof body.status!=="string"||!["active","paused","disabled","maintenance"].includes(body.status))return NextResponse.json({error:"Unsupported provider status."},{status:400});
+  if(typeof body.status!=="string"||!["draft","testing","active","suspended","retired"].includes(body.status))return NextResponse.json({error:"Unsupported provider status."},{status:400});
   const {data:before}=await db.from("providers").select("id,status").eq("id",id).maybeSingle();if(!before)return NextResponse.json({error:"Provider not found."},{status:404});
   try{await writeAdminAudit(db,user.id,"provider.status_changed","provider",id,{from:before.status,to:body.status});}catch{return NextResponse.json({error:"Audit write failed; no change made."},{status:503});}
   const {error}=await db.from("providers").update({status:body.status}).eq("id",id);if(error)return NextResponse.json({error:"Provider update failed."},{status:500});return NextResponse.json({ok:true});
