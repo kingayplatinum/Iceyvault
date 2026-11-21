@@ -32,19 +32,14 @@ export async function POST(request: Request) {
     orderId = order.id;
   }
 
+  const { data: wallet, error: walletError } = await db.from("wallets").select("id").eq("user_id", user.id).single();
+  if (walletError || !wallet) return NextResponse.json({ error: "Customer wallet is not initialized." }, { status: 409 });
   const txRef = `iv_${randomUUID().replaceAll("-", "")}`;
-  const amountNaira = (amountKobo / 100).toFixed(2);
   const origin = process.env.ICEYVAULT_APP_URL ?? new URL(request.url).origin;
   const { error: insertError } = await db.from("payment_transactions").insert({
-    user_id: user.id,
-    wallet_id: (await db.from("wallets").select("id").eq("user_id", user.id).single()).data?.id,
-    gateway: "flutterwave",
-    gateway_reference: txRef,
-    amount_kobo: amountKobo,
-    currency: "NGN",
-    status: "pending",
-    purpose: body.purpose,
-    order_id: orderId,
+    user_id: user.id, wallet_id: wallet.id, gateway: "flutterwave",
+    gateway_reference: txRef, amount_kobo: amountKobo, currency: "NGN",
+    status: "pending", purpose: body.purpose, order_id: orderId,
   });
   if (insertError) return NextResponse.json({ error: "Could not create payment record." }, { status: 500 });
 
@@ -53,7 +48,7 @@ export async function POST(request: Request) {
       "/payments",
       { method: "POST", body: JSON.stringify({
         tx_ref: txRef,
-        amount: amountNaira,
+        amount: (amountKobo / 100).toFixed(2),
         currency: "NGN",
         redirect_url: `${origin}/api/payments/flutterwave/callback`,
         customer: { email: user.email, name: user.user_metadata?.name ?? user.email.split("@")[0] },
