@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import {useEffect,useState} from "react";
-import {ArrowRight,Wallet,Smartphone,Clock3,Plus,MessageCircle,ArrowUpRight} from "lucide-react";
+import {ArrowRight,Wallet,Clock3,Plus,MessageCircle,ArrowUpRight} from "lucide-react";
 import {createClient} from "@/lib/supabase/client";
 import CustomerShell from "@/components/customer-shell";
 type Tx={id:string;direction:string;amount_kobo:number;description:string|null;created_at:string};
