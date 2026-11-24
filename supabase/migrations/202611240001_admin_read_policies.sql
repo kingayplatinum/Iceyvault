@@ -12,3 +12,6 @@ begin
     );
   end loop;
 end $$;
+
+-- These grants are safe because the matching tables have admin-only SELECT RLS policies.
+grant select on table public.audit_logs, public.provider_orders, public.provider_products, public.smscode_service_catalogue, public.smscode_product_tiers to authenticated;
