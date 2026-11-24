@@ -32,7 +32,7 @@ export default function Home() {
       <div className="announcement"><span className="announcement-dot" /> A better way to manage virtual numbers <span className="announcement-link">Explore IceyVault <ArrowRight size={13} /></span></div>
       <header className="site-header">
         <div className="nav-wrap">
-          <a className="brand" href="#" aria-label="IceyVault home"><span className="brand-mark">i</span><span>icey<span className="brand-accent">vault</span></span></Link>
+          <a className="brand" href="#" aria-label="IceyVault home"><span className="brand-mark">i</span><span>icey<span className="brand-accent">vault</span></span></a>
           <nav className={mobileOpen ? "main-nav mobile-visible" : "main-nav"}>
             <a href="#services" onClick={() => setMobileOpen(false)}>Explore services</a>
             <a href="#how" onClick={() => setMobileOpen(false)}>How it works</a>
@@ -40,8 +40,8 @@ export default function Home() {
             <a href="#help" onClick={() => setMobileOpen(false)}>Help</a>
           </nav>
           <div className="nav-actions">
-            <a className="login-link" href="/account">Log in</a>
-            <a className="button button-small" href="/account">Create account <ArrowRight size={15} /></a>
+            <Link className="login-link" href="/account">Log in</Link>
+            <Link className="button button-small" href="/account">Create account <ArrowRight size={15} /></Link>
           </div>
           <button className="mobile-menu" aria-label="Toggle navigation" onClick={() => setMobileOpen(!mobileOpen)}>{mobileOpen ? <X /> : <Menu />}</button>
         </div>
@@ -63,7 +63,7 @@ export default function Home() {
               <div className="vault-card-top"><div className="vault-symbol"><LockKeyhole size={18} /></div><span className="live-label"><span /> ACCOUNT PREVIEW</span></div>
               <div className="balance-label">Your wallet balance</div><div className="balance-amount">₦0<span>.00</span></div>
               <div className="balance-caption">NGN · Demo view until account setup</div>
-              <div className="wallet-actions"><Link href="/account"><ArrowDownToLine size={17} /><span>Add funds</span></a><Link href="/dashboard"><ArrowUpRight size={17} /><span>Transactions</span></a></div>
+              <div className="wallet-actions"><Link href="/account"><ArrowDownToLine size={17} /><span>Add funds</span></Link><Link href="/dashboard"><ArrowUpRight size={17} /><span>Transactions</span></Link></div>
               <div className="vault-divider" />
               <div className="activity-row"><div className="activity-icon"><MessageCircle size={17} /></div><div><b>Number activity</b><small>Track orders from your workspace</small></div><span className="activity-empty">—</span></div>
               <div className="card-foot"><ShieldCheck size={14} /> Your account activity, in one place</div>
@@ -119,7 +119,7 @@ export default function Home() {
 
       <section className="trust-section" id="trust"><div className="section-wrap trust-inner"><div><div className="eyebrow"><span className="eyebrow-line" /> BUILT AROUND TRUST</div><h2>Clarity at every<br />step of the journey.</h2><p>IceyVault is being built around transparent service information, responsible access and clear account controls.</p><a className="text-link" href="#help">Learn about our approach <ArrowRight size={15} /></a></div><div className="trust-points"><div><span><ShieldCheck size={20} /></span><section><b>Security-conscious foundations</b><p>Account data and payment operations are designed to be handled separately and securely.</p></section></div><div><span><BadgeCheck size={20} /></span><section><b>Clear service information</b><p>Country, service type, term and availability will be shown before checkout.</p></section></div><div><span><CircleHelp size={20} /></span><section><b>Support and accountability</b><p>Clear order status and support paths help you understand what happens next.</p></section></div></div></div></section>
 
-      <section className="cta-section" id="account"><div className="cta-card"><div className="cta-orb" /><div className="eyebrow"><Sparkles size={14} /> YOUR NEXT STEP</div><h2>Your number services,<br /><span>all in one vault.</span></h2><p>Create your account to access your personal workspace. Live payments and supplier fulfilment will be enabled after secure configuration.</p><a className="button" href="/account">Create account <ArrowRight size={16} /></a><small>Already registered? <a href="/account">Log in</a></small></div></section>
+      <section className="cta-section" id="account"><div className="cta-card"><div className="cta-orb" /><div className="eyebrow"><Sparkles size={14} /> YOUR NEXT STEP</div><h2>Your number services,<br /><span>all in one vault.</span></h2><p>Create your account to access your personal workspace. Live payments and supplier fulfilment will be enabled after secure configuration.</p><Link className="button" href="/account">Create account <ArrowRight size={16} /></Link><small>Already registered? <Link href="/account">Log in</Link></small></div></section>
 
       <footer className="site-footer" id="help"><div className="footer-main"><a className="brand" href="#"><span className="brand-mark">i</span><span>icey<span className="brand-accent">vault</span></span></a><p>A simpler home for supported virtual number services.</p><div className="footer-links"><a href="#services">Services</a><a href="#how">How it works</a><a href="#trust">Trust & safety</a><a href="mailto:support@iceyvault.com">Contact</a></div></div><div className="footer-bottom"><span>© {new Date().getFullYear()} IceyVault. All rights reserved.</span><span>Preview environment · Live services not yet connected</span></div></footer>
     </main>
