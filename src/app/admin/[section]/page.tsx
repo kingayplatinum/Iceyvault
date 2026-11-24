@@ -1,0 +1,1 @@
+import AdminSection from "@/components/admin-section";export default async function Page({params}:{params:Promise<{section:string}>}){const p=await params;return <AdminSection params={p}/>}
