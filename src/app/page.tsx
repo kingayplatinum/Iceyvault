@@ -10,14 +10,7 @@ import {
 type Category = "All services" | "WhatsApp" | "Telegram" | "Other services" | "Rentals";
 type Offer = { id: string; country: string; flag: string; service: string; kind: string; category: Category; detail: string; };
 
-const offers: Offer[] = [
-  { id: "us-wa", country: "United States", flag: "🇺🇸", service: "WhatsApp", kind: "SMS activation", category: "WhatsApp", detail: "US number · One-time verification" },
-  { id: "uk-wa", country: "United Kingdom", flag: "🇬🇧", service: "WhatsApp", kind: "SMS activation", category: "WhatsApp", detail: "UK number · One-time verification" },
-  { id: "us-tg", country: "United States", flag: "🇺🇸", service: "Telegram", kind: "SMS activation", category: "Telegram", detail: "US number · One-time verification" },
-  { id: "uk-tg", country: "United Kingdom", flag: "🇬🇧", service: "Telegram", kind: "SMS activation", category: "Telegram", detail: "UK number · One-time verification" },
-  { id: "us-other", country: "United States", flag: "🇺🇸", service: "Other platforms", kind: "SMS activation", category: "Other services", detail: "US number · Supported services" },
-  { id: "uk-rent", country: "United Kingdom", flag: "🇬🇧", service: "Private number", kind: "Number rental", category: "Rentals", detail: "UK number · Rental options" },
-];
+const offers: Offer[] = [];
 
 const categories: Category[] = ["All services", "WhatsApp", "Telegram", "Other services", "Rentals"];
 
@@ -72,7 +65,7 @@ export default function Home() {
               <div className="balance-caption">NGN · Demo view until account setup</div>
               <div className="wallet-actions"><a href="/account"><ArrowDownToLine size={17} /><span>Add funds</span></a><a href="/dashboard"><ArrowUpRight size={17} /><span>Transactions</span></a></div>
               <div className="vault-divider" />
-              <div className="activity-row"><div className="activity-icon"><MessageCircle size={17} /></div><div><b>Number activity</b><small>Your orders will appear here</small></div><span className="activity-empty">—</span></div>
+              <div className="activity-row"><div className="activity-icon"><MessageCircle size={17} /></div><div><b>Number activity</b><small>Track orders from your workspace</small></div><span className="activity-empty">—</span></div>
               <div className="card-foot"><ShieldCheck size={14} /> Your account activity, in one place</div>
             </div>
             <div className="floating-chip chip-top"><span className="chip-flag">🇺🇸</span><span><b>United States</b><small>Number services</small></span><BadgeCheck size={16} /></div>
@@ -84,7 +77,7 @@ export default function Home() {
 
       <section className="catalog-section" id="services">
         <div className="section-wrap">
-          <div className="section-heading"><div><div className="eyebrow"><span className="eyebrow-line" /> THE CATALOGUE</div><h2>Find the number<br className="mobile-break" /> service you need.</h2><p>Explore services by platform and country. Prices and availability will appear when verified supplier inventory is connected.</p></div><div className="catalog-count"><b>06</b><span>service options<br />in preview</span></div></div>
+          <div className="section-heading"><div><div className="eyebrow"><span className="eyebrow-line" /> THE CATALOGUE</div><h2>Find the number<br className="mobile-break" /> service you need.</h2><p>Explore services by platform and country. Only verified supplier services and current prices will appear here.</p></div><div className="catalog-count"><b>—</b><span>verified services<br />available soon</span></div></div>
           <div className="catalog-toolbar">
             <div className="category-tabs" role="tablist" aria-label="Filter by service">
               {categories.map((item) => <button key={item} role="tab" aria-selected={category === item} className={category === item ? "category-tab active" : "category-tab"} onClick={() => setCategory(item)}>{item}</button>)}
@@ -126,7 +119,7 @@ export default function Home() {
 
       <section className="trust-section" id="trust"><div className="section-wrap trust-inner"><div><div className="eyebrow"><span className="eyebrow-line" /> BUILT AROUND TRUST</div><h2>Clarity at every<br />step of the journey.</h2><p>IceyVault is being built around transparent service information, responsible access and clear account controls.</p><a className="text-link" href="#help">Learn about our approach <ArrowRight size={15} /></a></div><div className="trust-points"><div><span><ShieldCheck size={20} /></span><section><b>Security-conscious foundations</b><p>Account data and payment operations are designed to be handled separately and securely.</p></section></div><div><span><BadgeCheck size={20} /></span><section><b>Clear service information</b><p>Country, service type, term and availability will be shown before checkout.</p></section></div><div><span><CircleHelp size={20} /></span><section><b>Support and accountability</b><p>Clear order status and support paths help you understand what happens next.</p></section></div></div></div></section>
 
-      <section className="cta-section" id="account"><div className="cta-card"><div className="cta-orb" /><div className="eyebrow"><Sparkles size={14} /> YOUR NEXT STEP</div><h2>Your number services,<br /><span>all in one vault.</span></h2><p>Account registration and live checkout will be enabled in the next build stage.</p><button className="button" disabled>Create account <ArrowRight size={16} /></button><small>Account access is not active in this preview.</small></div></section>
+      <section className="cta-section" id="account"><div className="cta-card"><div className="cta-orb" /><div className="eyebrow"><Sparkles size={14} /> YOUR NEXT STEP</div><h2>Your number services,<br /><span>all in one vault.</span></h2><p>Create your account to access your personal workspace. Live payments and supplier fulfilment will be enabled after secure configuration.</p><a className="button" href="/account">Create account <ArrowRight size={16} /></a><small>Already registered? <a href="/account">Log in</a></small></div></section>
 
       <footer className="site-footer" id="help"><div className="footer-main"><a className="brand" href="#"><span className="brand-mark">i</span><span>icey<span className="brand-accent">vault</span></span></a><p>A simpler home for supported virtual number services.</p><div className="footer-links"><a href="#services">Services</a><a href="#how">How it works</a><a href="#trust">Trust & safety</a><a href="mailto:support@iceyvault.com">Contact</a></div></div><div className="footer-bottom"><span>© {new Date().getFullYear()} IceyVault. All rights reserved.</span><span>Preview environment · Live services not yet connected</span></div></footer>
     </main>
