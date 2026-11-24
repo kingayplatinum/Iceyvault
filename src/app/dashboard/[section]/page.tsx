@@ -1,0 +1,1 @@
+import CustomerSection from "@/components/customer-section";export default async function Page({params}:{params:Promise<{section:string}>}){const p=await params;return <CustomerSection section={p.section}/>} 
