@@ -94,7 +94,7 @@ export default function Home() {
               <div className="offer-card-bottom"><div><small>PRICE</small><b>Quote pending</b></div><span className="offer-type">{offer.kind}</span></div>
               <button className="offer-action" onClick={() => setSelectedOffer(offer)}>View service <ArrowRight size={15} /></button>
             </article>)}
-            {filtered.length === 0 && <div className="empty-state"><Search size={22} /><b>No matching services</b><span>Try another search or clear your filters.</span><button onClick={() => { setCategory("All services"); setCountry("All countries"); setQuery(""); }}>Clear filters</button></div>}
+            {filtered.length === 0 && <div className="empty-state"><Search size={22} /><b>No verified services available yet</b><span>Our catalogue will appear here after supplier availability is confirmed.</span><button onClick={() => { setCategory("All services"); setCountry("All countries"); setQuery(""); }}>Clear filters</button></div>}
           </div>
           <div className="catalog-note"><ShieldCheck size={17} /><span><b>Transparent availability.</b> We only display live prices and stock after a supplier check. No guessed prices or misleading availability.</span></div>
         </div>
