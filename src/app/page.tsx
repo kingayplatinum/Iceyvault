@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState } from "react";\nimport Link from "next/link";
 import {
   ArrowDownToLine, ArrowRight, ArrowUpRight, BadgeCheck, Check, ChevronDown,
   CircleHelp, Globe2, Headphones, LockKeyhole, Menu, MessageCircle, Search,
@@ -32,7 +32,7 @@ export default function Home() {
       <div className="announcement"><span className="announcement-dot" /> A better way to manage virtual numbers <span className="announcement-link">Explore IceyVault <ArrowRight size={13} /></span></div>
       <header className="site-header">
         <div className="nav-wrap">
-          <a className="brand" href="#" aria-label="IceyVault home"><span className="brand-mark">i</span><span>icey<span className="brand-accent">vault</span></span></a>
+          <a className="brand" href="#" aria-label="IceyVault home"><span className="brand-mark">i</span><span>icey<span className="brand-accent">vault</span></span></Link>
           <nav className={mobileOpen ? "main-nav mobile-visible" : "main-nav"}>
             <a href="#services" onClick={() => setMobileOpen(false)}>Explore services</a>
             <a href="#how" onClick={() => setMobileOpen(false)}>How it works</a>
@@ -63,7 +63,7 @@ export default function Home() {
               <div className="vault-card-top"><div className="vault-symbol"><LockKeyhole size={18} /></div><span className="live-label"><span /> ACCOUNT PREVIEW</span></div>
               <div className="balance-label">Your wallet balance</div><div className="balance-amount">₦0<span>.00</span></div>
               <div className="balance-caption">NGN · Demo view until account setup</div>
-              <div className="wallet-actions"><a href="/account"><ArrowDownToLine size={17} /><span>Add funds</span></a><a href="/dashboard"><ArrowUpRight size={17} /><span>Transactions</span></a></div>
+              <div className="wallet-actions"><Link href="/account"><ArrowDownToLine size={17} /><span>Add funds</span></a><Link href="/dashboard"><ArrowUpRight size={17} /><span>Transactions</span></a></div>
               <div className="vault-divider" />
               <div className="activity-row"><div className="activity-icon"><MessageCircle size={17} /></div><div><b>Number activity</b><small>Track orders from your workspace</small></div><span className="activity-empty">—</span></div>
               <div className="card-foot"><ShieldCheck size={14} /> Your account activity, in one place</div>
