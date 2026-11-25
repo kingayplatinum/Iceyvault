@@ -44,7 +44,10 @@ export default function CustomerSection({ section }: { section: string }) {
   const [fundAmount, setFundAmount] = useState("1000");
   const [buying, setBuying] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [lastOrderId, setLastOrderId] = useState<string | null>(null);\n  const [catalogCountry, setCatalogCountry] = useState("US");\n  const [catalogService, setCatalogService] = useState("");\n  const [catalogProduct, setCatalogProduct] = useState("");
+  const [lastOrderId, setLastOrderId] = useState<string | null>(null);
+  const [catalogCountry, setCatalogCountry] = useState("US");
+  const [catalogService, setCatalogService] = useState("");
+  const [catalogProduct, setCatalogProduct] = useState("");
 
   const catalogCountries = useMemo(() => Array.from(new Map(c.tiers.map(t => [t.country_iso2, { code: t.country_iso2, name: t.country_name || t.country_iso2 }])).values()).sort((a,b) => {
     const rank = (code: string) => code === "US" ? 0 : code === "GB" ? 1 : 2;
