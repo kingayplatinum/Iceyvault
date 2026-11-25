@@ -1,7 +1,7 @@
 const BASE_URL = "https://api.smscode.gg/v2";
 
 export class SmscodeError extends Error {
-  constructor(message: string, public readonly status: number, public readonly code?: string) {
+  constructor(message: string, public readonly status: number, public readonly code?: string, public readonly requestId?: string) {
     super(message);
     this.name = "SmscodeError";
   }
@@ -25,7 +25,7 @@ export async function smscodeRequest<T>(path: string, init: RequestInit = {}): P
     success?: boolean; data?: T; meta?: unknown; error?: { code?: string; message?: string };
   } | null;
   if (!response.ok || !payload?.success || payload.data === undefined) {
-    throw new SmscodeError(payload?.error?.message ?? "SMSCode request failed.", response.status, payload?.error?.code);
+    throw new SmscodeError(payload?.error?.message ?? "SMSCode request failed.", response.status, payload?.error?.code, response.headers.get("x-request-id") ?? response.headers.get("x-correlation-id") ?? undefined);
   }
   return { data: payload.data, meta: payload.meta };
 }
