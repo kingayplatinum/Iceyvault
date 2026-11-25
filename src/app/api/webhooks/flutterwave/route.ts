@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
 
   if (error) return new NextResponse("Could not locate payment", { status: 500 });
   if (!payment) return NextResponse.json({ received: true, matched: false });
-  if (payment.gateway_transaction_id && providerId && /^\\d+$/.test(providerId) &&
+  if (payment.gateway_transaction_id && providerId && /^\d+$/.test(providerId) &&
       payment.gateway_transaction_id !== providerId) {
     return new NextResponse("Provider transaction mismatch", { status: 409 });
   }
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
   try {
     // V3 Standard uses numeric transaction IDs. Newer webhook payloads can expose
     // charge IDs instead, so the verifier falls back to the unique tx_ref.
-    await verifyAndCreditWalletPayment(payment.id, providerId && /^\\d+$/.test(providerId) ? providerId : null);
+    await verifyAndCreditWalletPayment(payment.id, providerId && /^\d+$/.test(providerId) ? providerId : null);
     return NextResponse.json({ received: true, matched: true });
   } catch {
     // A non-200 response asks Flutterwave to retry; the wallet remains uncredited
