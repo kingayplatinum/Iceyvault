@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 const patchSchema = z.object({
   tier_label: z.string().trim().min(1).max(100).optional(),
   smscode_product_id: z.string().trim().max(160).nullable().optional(),
-  smscode_catalog_product_id: z.string().trim().max(160).nullable().optional(),
+  smscode_catalog_product_id: z.string().trim().max(160).nullable().optional(),\n  smscode_operator_id: z.number().int().positive().nullable().optional(),
   max_supplier_price_usd: z.number().finite().nonnegative().max(100000).optional(),
   retail_price_kobo: z.number().int().nonnegative().max(100000000000).optional(),
   active: z.boolean().optional(),
