@@ -24,7 +24,40 @@ export default function AdminPage(){
  useEffect(()=>{if(!availableServices.some(s=>s.id===serviceFilter))setServiceFilter(availableServices[0]?.id||"");},[availableServices,serviceFilter]);
  useEffect(()=>{if(!productOptions.some(t=>t.id===selectedTierId)){const next=productOptions[0];setSelectedTierId(next?.id||"");setConfig(next?{cap:String(next.max_supplier_price_usd),retail:String(next.retail_price_kobo/100)}:{cap:"",retail:""});}},[productOptions,selectedTierId]);
  async function checkFlutterwave(){setBusy(true);try{const r=await fetch("/api/admin/flutterwave/connection",{cache:"no-store"});const j=await r.json();setFlutterwave(j);setNotice({kind:r.ok&&j.connected?"success":"error",title:j.connected?"Flutterwave is connected":"Flutterwave connection check failed",body:j.message||"Authentication check completed."});}catch{setNotice({kind:"error",title:"Flutterwave check failed",body:"Could not reach the connection endpoint."});}finally{setBusy(false);}}
- async function sync(){setBusy(true);setNotice({kind:"info",title:"Full supplier catalogue sync running",body:"Discovering all active SMSCode countries and services, then importing every available product. Keep this page open while the catalogue is synchronised."});try{const r=await fetch("/api/admin/smscode/services",{method:"POST"});const j=await r.json();if(r.ok)setNotice({kind:"success",title:"Supplier catalogue synchronised",body:(j.countriesSynced||0)+" countries · "+(j.servicesSynced||0)+" services · "+(j.productsSeen||0)+" products · "+(j.productsInserted||0)+" new tiers · "+(j.productsRefreshed||0)+" refreshed",detail:j.note||"Review pricing before activation."});else setNotice({kind:"error",title:"Supplier sync failed",body:j.error||"SMSCode did not complete the request.",detail:["Stage: "+(j.stage||"unknown"),j.supplierStatus?"HTTP "+j.supplierStatus:"",j.supplierCode?"Code "+j.supplierCode:"",j.supplierRequestId?"Request "+j.supplierRequestId:"",j.hint||""].filter(Boolean).join(" · ")});await load(true);}catch{setNotice({kind:"error",title:"Supplier sync failed",body:"Could not reach the sync endpoint."});}finally{setBusy(false);}}
+ async function sync(){
+  setBusy(true);
+  let completed=0;
+  const totals={countries:0,services:0,seen:0,inserted:0,refreshed:0};
+  try{
+   setNotice({kind:"info",title:"Discovering supplier catalogue",body:"Loading every active country from SMSCode. The United States and United Kingdom will be processed first."});
+   const discovery=await fetch("/api/admin/smscode/services",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:"discover"})});
+   const discoveryData=await discovery.json().catch(()=>({}));
+   if(!discovery.ok)throw new Error(discoveryData.error||"Could not discover SMSCode countries.");
+   const countries=(discoveryData.countries||[]).sort((a:{code:string},b:{code:string})=>{
+    const rank=(code:string)=>code==="US"?0:code==="GB"?1:2;
+    return rank(a.code)-rank(b.code);
+   });
+   if(!countries.length)throw new Error("SMSCode returned no active countries.");
+   totals.countries=countries.length;
+   for(let index=0;index<countries.length;index++){
+    const country=countries[index];
+    setNotice({kind:"info",title:"Importing full supplier catalogue",body:"Syncing "+country.name+" ("+(index+1)+" of "+countries.length+"). Previously imported countries are retained if a later country fails."});
+    const response=await fetch("/api/admin/smscode/services",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:"country",countryId:country.id})});
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error((result.country||country.name)+": "+(result.error||"Catalogue import failed.")+" · "+(result.stage||"unknown stage")+(result.hint?" · "+result.hint:""));
+    completed++;
+    totals.services+=result.servicesSynced||0;
+    totals.seen+=result.productsSeen||0;
+    totals.inserted+=result.productsInserted||0;
+    totals.refreshed+=result.productsRefreshed||0;
+   }
+   setNotice({kind:"success",title:"Full supplier catalogue synchronised",body:completed+" countries · "+totals.services+" services · "+totals.seen+" products · "+totals.inserted+" new tiers · "+totals.refreshed+" refreshed",detail:"All imported products remain inactive until you configure retail pricing and explicitly activate them."});
+   await load(true);
+  }catch(error){
+   setNotice({kind:"error",title:"Supplier catalogue sync stopped",body:error instanceof Error?error.message:"Could not complete the SMSCode catalogue import.",detail:completed+" countries completed before the error. Run Sync catalogue again to safely resume; existing prices and activation settings are preserved."});
+   await load(true);
+  }finally{setBusy(false);}
+ }
  async function webhookSetup(){setBusy(true);try{const r=await fetch("/api/admin/smscode/webhook",{method:"POST"});const j=await r.json();if(r.ok){setWebhook(true);setNotice({kind:"success",title:"Webhook configured",body:"SMSCode OTP and order events can update customer orders."});}else setNotice({kind:"error",title:"Webhook setup failed",body:j.error||"Could not configure webhook."});}catch{setNotice({kind:"error",title:"Webhook setup failed",body:"Could not reach the webhook endpoint."});}finally{setBusy(false);}}
  async function toggleService(s:S){setBusy(true);try{const r=await fetch("/api/admin/smscode/services/"+s.id,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({active:!s.active})});const j=await r.json();setNotice(r.ok?{kind:"success",title:"Service updated",body:s.active?"Service hidden from customers.":"Service enabled. Individual tiers still require pricing and activation."}:{kind:"error",title:"Service update failed",body:j.error||"Could not update service."});await load(true);}catch{setNotice({kind:"error",title:"Service update failed",body:"Could not reach the service endpoint."});}finally{setBusy(false);}}
  async function configureSelected(e:React.FormEvent){e.preventDefault();if(!selectedTier)return;await updateTier(selectedTier,{max_supplier_price_usd:Number(config.cap),retail_price_kobo:Math.round(Number(config.retail)*100)});}
