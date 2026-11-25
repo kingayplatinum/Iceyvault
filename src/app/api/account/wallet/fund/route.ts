@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         tx_ref: reference,
-        amount: (parsed.data.amountKobo / 100).toFixed(2),
+        amount: parsed.data.amountKobo / 100,
         currency: "NGN",
         redirect_url: redirectUrl.toString(),
         customer: {
