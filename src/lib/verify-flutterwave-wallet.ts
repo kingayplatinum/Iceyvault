@@ -30,7 +30,7 @@ export async function verifyAndCreditWalletPayment(paymentId: string, providerTr
   if (!secretKey) throw new Error("FLW_SECRET_KEY is not configured.");
   // The hosted checkout redirect normally includes transaction_id. If a browser
   // closes early or a newer webhook uses a non-numeric charge ID, verify by tx_ref.
-  const numericId = suppliedId && /^\\d+$/.test(String(suppliedId)) ? String(suppliedId) : null;
+  const numericId = suppliedId && /^\d+$/.test(String(suppliedId)) ? String(suppliedId) : null;
   const verifyUrl = numericId
     ? `https://api.flutterwave.com/v3/transactions/${encodeURIComponent(numericId)}/verify`
     : `https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${encodeURIComponent(payment.gateway_reference)}`;
