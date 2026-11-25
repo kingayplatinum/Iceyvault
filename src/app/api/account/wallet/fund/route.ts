@@ -3,19 +3,14 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { flutterwaveV4Request } from "@/lib/flutterwave-v4";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type V4Order = {
-  id: string;
-  amount: number;
-  currency: string;
-  reference: string;
-  status: string;
-  next_action?: { type?: string; redirect_url?: { url?: string } };
-  redirect_url?: string;
+type V3CheckoutResponse = {
+  status?: string;
+  message?: string;
+  data?: { link?: string };
 };
 const schema = z.object({
   amountKobo: z.number().int().min(5000).max(50_000_000),
@@ -29,10 +24,12 @@ export async function POST(request: NextRequest) {
 
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Enter a valid amount between ₦50 and ₦500,000." }, { status: 400 });
+  if (!user.email) return NextResponse.json({ error: "A valid email address is required for Flutterwave checkout." }, { status: 400 });
 
-  if (!user.email) return NextResponse.json({ error: "A verified email address is required for Flutterwave checkout. Add an email to your account first." }, { status: 400 });
-  if (!process.env.FLW_CLIENT_ID || !process.env.FLW_CLIENT_SECRET || !process.env.FLW_WEBHOOK_SECRET_HASH || !process.env.FLW_API_BASE_URL) {
-    return NextResponse.json({ error: "Flutterwave V4 is not fully configured for this environment. No payment was initiated." }, { status: 503 });
+  const secretKey = process.env.FLW_SECRET_KEY;
+  const webhookSecret = process.env.FLW_WEBHOOK_SECRET_HASH;
+  if (!secretKey || !webhookSecret) {
+    return NextResponse.json({ error: "Flutterwave Standard is not fully configured. No payment was initiated." }, { status: 503 });
   }
 
   const service = createServiceClient();
@@ -56,20 +53,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { data: profile } = await service.from("profiles")
-    .select("display_name,phone_e164,billing_address_line1,billing_city,billing_state,billing_postal_code,billing_country").eq("id", user.id).maybeSingle();
-  const address = {
-    line1: profile?.billing_address_line1?.trim(),
-    city: profile?.billing_city?.trim(),
-    state: profile?.billing_state?.trim(),
-    postal_code: profile?.billing_postal_code?.trim(),
-    country: (profile?.billing_country || "NG").trim().toUpperCase(),
-  };
-  if (!address.line1 || !address.city || !address.state || !address.postal_code || !/^[A-Z]{2}$/.test(address.country)) {
-      return NextResponse.json({
-      error: "Add your billing address (street, city, state and postal code) in Account settings before funding your wallet. No payment was initiated.",
-      code: "BILLING_ADDRESS_REQUIRED",
-    }, { status: 400 });
-  }
+    .select("display_name,phone_e164").eq("id", user.id).maybeSingle();
 
   const reference = `IVW${randomUUID().replaceAll("-", "")}`;
   const { data: payment, error: paymentError } = await service.from("payment_transactions").insert({
@@ -84,77 +68,69 @@ export async function POST(request: NextRequest) {
   }).select("id").single();
   if (paymentError || !payment) return NextResponse.json({ error: "Could not create a payment request. Please retry once." }, { status: 500 });
 
-  const displayName = (profile?.display_name || user.email?.split("@")[0] || "IceyVault Customer").trim();
-  const parts = displayName.split(/\s+/).filter(Boolean);
-  const first = parts[0] && parts[0].length >= 2 ? parts[0] : "IceyVault";
-  const last = parts.slice(1).join(" ") || "Customer";
-  const phoneDigits = (profile?.phone_e164 || "").replace(/^\+234/, "").replace(/^0/, "");
+  const displayName = (profile?.display_name || user.email.split("@")[0] || "IceyVault Customer").trim();
+  const phoneNumber = (profile?.phone_e164 || "").replace(/[^0-9]/g, "");
   const redirectUrl = new URL("/dashboard/wallet", request.nextUrl.origin);
   redirectUrl.searchParams.set("payment", "pending");
   redirectUrl.searchParams.set("reference", reference);
 
   try {
-    const idempotency = `IVW${randomUUID().replaceAll("-", "")}`;
-    const traceId = randomUUID().replaceAll("-", "");
-    const result = await flutterwaveV4Request<V4Order>("orchestration/direct-orders", {
+    const response = await fetch("https://api.flutterwave.com/v3/payments", {
       method: "POST",
-      headers: { "X-Idempotency-Key": idempotency, "X-Trace-Id": traceId },
+      headers: {
+        Authorization: `Bearer ${secretKey}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
       body: JSON.stringify({
-        amount: parsed.data.amountKobo / 100,
+        tx_ref: reference,
+        amount: (parsed.data.amountKobo / 100).toFixed(2),
         currency: "NGN",
-        reference,
-        customer: {
-          address,
-          email: user.email,
-          name: { first, last },
-          ...(phoneDigits.length >= 7 && phoneDigits.length <= 10
-            ? { phone: { country_code: "234", number: phoneDigits } }
-            : {}),
-        },
-        payment_method: { type: "card" },
         redirect_url: redirectUrl.toString(),
-        description: "IceyVault wallet funding",
+        customer: {
+          email: user.email,
+          name: displayName,
+          ...(phoneNumber.length >= 7 ? { phone_number: phoneNumber } : {}),
+        },
+        customizations: {
+          title: "IceyVault Wallet Funding",
+          description: "Add funds to your IceyVault NGN wallet",
+        },
+        configuration: { session_duration: 30, max_retry_attempt: 5 },
         meta: { payment_id: payment.id, purpose: "wallet_funding" },
       }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(20_000),
     });
 
-    const checkoutUrl = result.data.next_action?.redirect_url?.url || result.data.redirect_url;
-    if (!checkoutUrl || !/^https:\/\//i.test(checkoutUrl)) {
-      await service.from("payment_transactions").update({
-        gateway_transaction_id: result.data.id,
-        raw_event: { provider_status: result.data.status, message: "V4 order created without a hosted redirect URL" },
-        updated_at: new Date().toISOString(),
-      }).eq("id", payment.id);
-      return NextResponse.json({ error: "Flutterwave created the order but did not return a hosted checkout link. The payment remains pending; contact support before retrying.", reference }, { status: 202 });
-    }
-
-    await service.from("payment_transactions").update({
-      gateway_transaction_id: result.data.id,
-      checkout_url: checkoutUrl,
-      raw_event: { provider_order_id: result.data.id, provider_status: result.data.status },
-      updated_at: new Date().toISOString(),
-    }).eq("id", payment.id);
-
-    return NextResponse.json({ checkoutUrl, reference }, { status: 201 });
-  } catch (error) {
-    const status = (error as Error & { status?: number }).status;
-    if (status && status >= 400 && status < 500) {
-      const providerError = error as Error & { providerCode?: string; validationErrors?: Array<{ field_name?: string; message?: string }> };
-      const validationErrors = providerError.validationErrors ?? [];
+    const result = await response.json().catch(() => null) as V3CheckoutResponse | null;
+    const checkoutUrl = result?.data?.link;
+    if (!response.ok || result?.status !== "success" || !checkoutUrl || !checkoutUrl.startsWith("https://checkout.flutterwave.com/")) {
       await service.from("payment_transactions").update({
         status: "failed",
-        raw_event: { provider_error: providerError.message, provider_code: providerError.providerCode ?? null, validation_errors: validationErrors },
-        failure_reason: validationErrors.map((item) => [item.field_name, item.message].filter(Boolean).join(": ")).join("; ").slice(0, 500) || providerError.message.slice(0, 500),
+        failure_reason: (result?.message || "Flutterwave did not return a valid hosted checkout link.").slice(0, 500),
+        raw_event: { provider_status: result?.status ?? null, provider_message: result?.message ?? null, http_status: response.status },
         updated_at: new Date().toISOString(),
-      }).eq("id", payment.id);
-      const detail = validationErrors.map((item) => [item.field_name, item.message].filter(Boolean).join(": ")).filter(Boolean).join(" · ");
+      }).eq("id", payment.id).eq("status", "pending");
       return NextResponse.json({
-        error: detail ? "Flutterwave rejected the checkout details: " + detail : "Flutterwave declined the checkout request. No wallet funds were added.",
-        code: providerError.providerCode ?? "FLUTTERWAVE_REQUEST_REJECTED",
+        error: result?.message || "Flutterwave could not create a hosted checkout. No wallet funds were added.",
+        reference,
       }, { status: 502 });
     }
+
+    const { error: updateError } = await service.from("payment_transactions").update({
+      checkout_url: checkoutUrl,
+      raw_event: { provider_status: result.status, provider_message: result.message, checkout: "flutterwave_standard_v3" },
+      updated_at: new Date().toISOString(),
+    }).eq("id", payment.id).eq("status", "pending");
+    if (updateError) {
+      return NextResponse.json({ error: "Checkout was created but could not be saved safely. Contact support before starting another payment.", reference }, { status: 202 });
+    }
+
+    return NextResponse.json({ checkoutUrl, reference }, { status: 201 });
+  } catch {
     return NextResponse.json({
-      error: "Flutterwave did not return a conclusive response. The payment request remains pending; retry with the same request key or contact support.",
+      error: "Flutterwave did not return a conclusive response. The request remains pending; retry with the same amount so the same request key is reused.",
       reference,
     }, { status: 202 });
   }
