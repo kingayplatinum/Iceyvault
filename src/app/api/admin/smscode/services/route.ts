@@ -70,7 +70,7 @@ export async function POST() {
       const tierRows = validProducts.map((product) => ({
         service_id: stored.id,
         tier_key: String(product.id),
-        tier_label: product.name,
+        tier_label: product.operator_name ? product.name + " · " + product.operator_name : product.name,\n        smscode_operator_id: product.operator_id ?? null,
         country_iso2: "NG",
         smscode_product_id: String(product.id),
         smscode_catalog_product_id: product.catalog_product_id == null ? null : String(product.catalog_product_id),
