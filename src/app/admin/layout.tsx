@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import Link from "next/link";
+import Link from "next/link";\nimport Image from "next/image";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -42,7 +42,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="admin-shell">
       <aside className="admin-sidebar">
         <div className="admin-sidebar-head">
-          <Link href="/" className="admin-brand">icey<span>vault</span><small>ADMIN</small></Link>
+          <Link href="/" className="admin-brand" aria-label="IceyVault admin home"><Image src="/iceyvault-logo.webp" alt="IceyVault" width={240} height={65} priority /><small>ADMIN</small></Link>
           <details className="admin-mobile-more">
             <summary aria-label="More admin pages"><MoreHorizontal size={21} /></summary>
             <div className="admin-mobile-menu">
