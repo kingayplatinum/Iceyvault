@@ -6,7 +6,7 @@ function getApiBase(): URL {
   const raw = process.env.FLW_API_BASE_URL;
   if (!raw) throw new Error("FLW_API_BASE_URL is not configured. Set the Flutterwave V4 API base URL for this environment.");
   const url = new URL(raw);
-  if (url.protocol !== "https:" || !["api.flutterwave.com", "developersandbox-api.flutterwave.com"].includes(url.hostname)) {
+  if (url.protocol !== "https:" || !["f4bexperience.flutterwave.com", "developersandbox-api.flutterwave.com"].includes(url.hostname)) {
     throw new Error("FLW_API_BASE_URL must use an approved HTTPS Flutterwave API host.");
   }
   return new URL(url.pathname.endsWith("/") ? url.pathname : url.pathname + "/", url.origin);
