@@ -11,7 +11,8 @@ export async function GET() {
 
   const clientId = process.env.FLW_CLIENT_ID;
   const clientSecret = process.env.FLW_CLIENT_SECRET;
-  const webhookSecret = process.env.FLW_WEBHOOK_SECRET_HASH;\n  const apiBase = process.env.FLW_API_BASE_URL;
+  const webhookSecret = process.env.FLW_WEBHOOK_SECRET_HASH;
+  const apiBase = process.env.FLW_API_BASE_URL;
   const missing = [
     !clientId && "FLW_CLIENT_ID",
     !clientSecret && "FLW_CLIENT_SECRET",
