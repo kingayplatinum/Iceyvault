@@ -15,6 +15,8 @@ type V3CheckoutResponse = {
 const schema = z.object({
   amountKobo: z.number().int().min(5000).max(50_000_000),
   idempotencyKey: z.string().uuid(),
+}).refine((value) => value.amountKobo % 100 === 0, {
+  message: "Enter a whole naira amount. Flutterwave Standard V3 accepts integer amounts.",
 });
 
 export async function POST(request: NextRequest) {
@@ -84,7 +86,7 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         tx_ref: reference,
-        amount: parsed.data.amountKobo / 100,
+        amount: Math.round(parsed.data.amountKobo / 100),
         currency: "NGN",
         redirect_url: redirectUrl.toString(),
         customer: {
