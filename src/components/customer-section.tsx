@@ -87,9 +87,13 @@ export default function CustomerSection({ section }: { section: string }) {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const reference = params.get("reference");
+    const reference = params.get("reference") || params.get("tx_ref");
+    const transactionId = params.get("transaction_id");
     if (section === "wallet" && params.get("payment") === "pending" && reference) {
-      fetch("/api/account/wallet/verify?reference=" + encodeURIComponent(reference), { cache: "no-store" })
+      const verifyUrl = new URL("/api/account/wallet/verify", window.location.origin);
+      verifyUrl.searchParams.set("reference", reference);
+      if (transactionId) verifyUrl.searchParams.set("transaction_id", transactionId);
+      fetch(verifyUrl.toString(), { cache: "no-store" })
         .then(async (r) => {
           const j = await r.json();
           setNotice(j.status === "successful"
@@ -149,10 +153,6 @@ export default function CustomerSection({ section }: { section: string }) {
     const amountKobo = Math.round(Number(fundAmount) * 100);
     if (!Number.isFinite(amountKobo) || amountKobo < 5000 || amountKobo > 50000000) {
       setNotice("Enter an amount between ₦50 and ₦500,000.");
-      return;
-    }
-    if (!billing.line1.trim() || !billing.city.trim() || !billing.state.trim() || !billing.postal_code.trim()) {
-      setNotice("Complete and save your billing address before continuing to Flutterwave.");
       return;
     }
     setBuying(true);
@@ -272,7 +272,7 @@ export default function CustomerSection({ section }: { section: string }) {
 
           <section className="workspace-panel">
             <div className="workspace-section-title">
-              <div><h2>Billing details</h2><p>Flutterwave requires a billing address to create a payment order.</p></div>
+              <div><h2>Billing details</h2><p>Optional billing details for your account. They are not required for hosted checkout.</p></div>
               <MapPin size={20} className="workspace-purple-icon"/>
             </div>
             <div className="workspace-form-grid">
@@ -315,7 +315,7 @@ export default function CustomerSection({ section }: { section: string }) {
             </form>
           </section>
           <section className="workspace-panel">
-            <div className="workspace-section-title"><div><h2>Billing address</h2><p>Used to process wallet payments through Flutterwave.</p></div></div>
+            <div className="workspace-section-title"><div><h2>Billing address</h2><p>Optional contact and billing details for your account.</p></div></div>
             <div className="workspace-form-grid">
               {field("Street address", billing.line1, (v) => setBilling({ ...billing, line1: v }), "House number and street")}
               {field("City", billing.city, (v) => setBilling({ ...billing, city: v }), "Your city")}
