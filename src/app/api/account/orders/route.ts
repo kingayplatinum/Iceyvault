@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ orderId, status: "review_required", message: "Supplier accepted the order, but the local provider record needs administrator attention." }, { status: 202 });
   }
 
-  const { error: providerOrderError } = await service.from("provider_orders").insert({
+  const { data: providerOrder, error: providerOrderError } = await service.from("provider_orders").insert({
     order_id: orderId,
     provider_id: provider.id,
     provider_order_ref: String(supplierOrder.id),
