@@ -10,7 +10,9 @@ export async function GET(request: NextRequest) {
   const auth = await createClient();
   const { data: { user } } = await auth.auth.getUser();
   if (!user) return NextResponse.json({ error: "Sign in required." }, { status: 401 });
-  const reference = request.nextUrl.searchParams.get("reference");
+
+  const reference = request.nextUrl.searchParams.get("reference") || request.nextUrl.searchParams.get("tx_ref");
+  const transactionId = request.nextUrl.searchParams.get("transaction_id");
   if (!reference || !/^[A-Za-z0-9-]{6,42}$/.test(reference)) {
     return NextResponse.json({ error: "A valid payment reference is required." }, { status: 400 });
   }
@@ -23,7 +25,7 @@ export async function GET(request: NextRequest) {
   if (error || !payment) return NextResponse.json({ error: "Payment request not found." }, { status: 404 });
 
   try {
-    const result = await verifyAndCreditWalletPayment(payment.id);
+    const result = await verifyAndCreditWalletPayment(payment.id, transactionId);
     const { data: wallet } = await service.from("wallets")
       .select("balance_kobo,currency").eq("user_id", user.id).maybeSingle();
     return NextResponse.json({
@@ -33,6 +35,9 @@ export async function GET(request: NextRequest) {
       walletBalanceKobo: wallet?.balance_kobo ?? null,
     }, { headers: { "Cache-Control": "no-store" } });
   } catch {
-    return NextResponse.json({ status: "pending", message: "Flutterwave has not yet confirmed this payment. Your wallet has not been credited." }, { status: 202 });
+    return NextResponse.json({
+      status: "pending",
+      message: "Flutterwave has not yet confirmed this payment. Your wallet has not been credited.",
+    }, { status: 202, headers: { "Cache-Control": "no-store" } });
   }
 }
