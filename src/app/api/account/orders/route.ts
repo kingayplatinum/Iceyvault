@@ -103,6 +103,12 @@ export async function POST(request: NextRequest) {
         }
         numberId = recoveredNumber.id;
       }
+      const recoveredCostUsd = Number(live.data.amount?.amount);
+      if (live.data.amount?.currency !== "USD" || !Number.isFinite(recoveredCostUsd) || recoveredCostUsd > Number(reservation.supplier_cap_usd)) {
+        await service.from("orders").update({ number_id: numberId, status: "review_required", updated_at: new Date().toISOString() }).eq("id", orderId);
+        await service.from("provider_orders").update({ status: "REVIEW_REQUIRED", supplier_cost_usd: Number.isFinite(recoveredCostUsd) ? recoveredCostUsd : null, updated_at: new Date().toISOString() }).eq("id", existingProviderOrder.id);
+        return NextResponse.json({ orderId, status: "review_required", message: "Supplier order recovered, but its final price requires administrator reconciliation." }, { status: 202 });
+      }
       const { data: ledger } = await service.from("supplier_cost_ledger").select("id").eq("order_id", orderId).maybeSingle();
       if (!ledger && live.data.amount?.currency === "USD") {
         const { error: ledgerError } = await service.from("supplier_cost_ledger").insert({
