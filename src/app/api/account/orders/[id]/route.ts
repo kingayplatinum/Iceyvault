@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 type SupplierOrder = {
   id: number; status: string; otp_code?: string | null; otp_message?: string | null;
-  can_resend?: boolean; can_cancel?: boolean; expires_at?: string | null;
+  can_resend?: boolean; can_cancel?: boolean; can_finish?: boolean; expires_at?: string | null;
 };
 
 export async function GET(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       const result = await smscodeRequest<{ order_id: number; status: string }>("/orders/finish", {
         method: "POST", body: JSON.stringify({ id: supplierId }),
       });
-      await service.from("orders").update({ status: "completed", fulfilled_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", id);
+      await service.from("orders").update({ status: "completed", fulfilled_at: new Date().toISOString(), completed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", id);
       await service.from("provider_orders").update({ status: result.data.status, updated_at: new Date().toISOString() }).eq("order_id", id);
       return NextResponse.json({ status: "completed" });
     }
