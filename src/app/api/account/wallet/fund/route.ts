@@ -30,7 +30,8 @@ export async function POST(request: NextRequest) {
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Enter a valid amount between ₦50 and ₦500,000." }, { status: 400 });
 
-  if (!user.email) return NextResponse.json({ error: "A verified email address is required for Flutterwave checkout. Add an email to your account first." }, { status: 400 });\n  if (!process.env.FLW_CLIENT_ID || !process.env.FLW_CLIENT_SECRET || !process.env.FLW_WEBHOOK_SECRET_HASH || !process.env.FLW_API_BASE_URL) {
+  if (!user.email) return NextResponse.json({ error: "A verified email address is required for Flutterwave checkout. Add an email to your account first." }, { status: 400 });
+  if (!process.env.FLW_CLIENT_ID || !process.env.FLW_CLIENT_SECRET || !process.env.FLW_WEBHOOK_SECRET_HASH || !process.env.FLW_API_BASE_URL) {
     return NextResponse.json({ error: "Flutterwave V4 is not fully configured for this environment. No payment was initiated." }, { status: 503 });
   }
 
