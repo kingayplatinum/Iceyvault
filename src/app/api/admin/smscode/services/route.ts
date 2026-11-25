@@ -166,7 +166,8 @@ export async function POST(request: NextRequest) {
             .from("smscode_product_tiers")
             .select("id,tier_key")
             .eq("service_id", stored.id)
-            .eq("country_iso2", country.code.toUpperCase());
+            .eq("country_iso2", country.code.toUpperCase())
+            .in("tier_key", rows.map((row) => row.tier_key));
           if (existingError) throw existingError;
           const existingByKey = new Map((existing ?? []).map((tier) => [tier.tier_key, tier.id]));
           const newRows = rows.filter((row) => !existingByKey.has(row.tier_key));
