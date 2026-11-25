@@ -11,11 +11,11 @@ export async function GET() {
 
   const clientId = process.env.FLW_CLIENT_ID;
   const clientSecret = process.env.FLW_CLIENT_SECRET;
-  const webhookSecret = process.env.FLW_WEBHOOK_SECRET_HASH;
+  const webhookSecret = process.env.FLW_WEBHOOK_SECRET_HASH;\n  const apiBase = process.env.FLW_API_BASE_URL;
   const missing = [
     !clientId && "FLW_CLIENT_ID",
     !clientSecret && "FLW_CLIENT_SECRET",
-    !webhookSecret && "FLW_WEBHOOK_SECRET_HASH",
+    !webhookSecret && "FLW_WEBHOOK_SECRET_HASH",\n    !apiBase && "FLW_API_BASE_URL",
   ].filter(Boolean);
 
   if (missing.length) {
@@ -24,7 +24,7 @@ export async function GET() {
       connected: false,
       mode: "live",
       missing,
-      message: "Flutterwave Live credentials are incomplete in the production environment.",
+      message: "Flutterwave V4 Live credentials or API endpoint are incomplete in this environment.",
     }, { status: 503 });
   }
 
