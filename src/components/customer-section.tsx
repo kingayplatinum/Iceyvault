@@ -360,7 +360,7 @@ export default function CustomerSection({ section }: { section: string }) {
 
       {section === "notifications" ? <section className="workspace-panel"><div className="workspace-section-title"><div><h2>Notifications</h2><p>Updates about your account and services.</p></div></div>{loading ? <Empty text="Loading notifications…"/> : d.notifications?.length ? <div className="workspace-list">{d.notifications.map((n) => <div className="workspace-list-row" key={n.id}><span className="workspace-list-icon"><Clock3 size={17}/></span><div className="workspace-list-main"><b>{n.title}</b><small>{n.body}</small><small>{date(n.created_at)}</small></div></div>)}</div> : <Empty text="You&apos;re all caught up."/>}</section> : null}
 
-      {section === "support" ? <section className="workspace-panel"><div className="workspace-section-title"><div><h2>Support centre</h2><p>Our team can help with account access, payments and orders.</p></div></div><a className="workspace-primary workspace-support-link" href="mailto:support@iceyvault.com">Email support <ArrowUpRight size={16}/></a></section> : null}
+      {section === "support" ? <section className="workspace-panel"><div className="workspace-section-title"><div><h2>Support centre</h2><p>Find help with your payment history, number activations and verification messages.</p></div></div><div className="workspace-form-footer"><Link className="workspace-secondary" href="/dashboard/orders">Review my orders <ArrowUpRight size={15}/></Link><Link className="workspace-secondary" href="/dashboard/messages">Open SMS inbox <ArrowUpRight size={15}/></Link></div></section> : null}
 
       {notice ? <div className="workspace-notice" role="status"><ShieldCheck size={18}/><span>{notice}</span></div> : null}
     </>
