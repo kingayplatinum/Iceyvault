@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
   const { data: payment, error } = await query.maybeSingle();
   if (error) return new NextResponse("Could not locate payment", { status: 500 });
   if (!payment) return NextResponse.json({ received: true, matched: false });
-  if (providerId && payment.gateway_transaction_id && providerId !== payment.gateway_transaction_id) {
+  if (payload.event === "order.completed" && providerId && payment.gateway_transaction_id && providerId !== payment.gateway_transaction_id) {
     return new NextResponse("Provider order mismatch", { status: 409 });
   }
 
