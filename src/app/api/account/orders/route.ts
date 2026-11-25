@@ -84,7 +84,9 @@ export async function POST(request: NextRequest) {
     return fail("This tier is not configured with a supplier-enforced price cap. Your wallet has been refunded.", 409);
   }
 
-  let supplierOrder: SupplierOrder;\n  let supplierFxRate: number | null = null;\n  let supplierFxAsOf: string | null = null;
+  let supplierOrder: SupplierOrder;
+  let supplierFxRate: number | null = null;
+  let supplierFxAsOf: string | null = null;
   try {
     const result = await smscodeRequest<CreateResult>("/orders/create", {
       method: "POST",
