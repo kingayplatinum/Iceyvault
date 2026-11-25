@@ -15,7 +15,8 @@ export async function GET() {
   const missing = [
     !clientId && "FLW_CLIENT_ID",
     !clientSecret && "FLW_CLIENT_SECRET",
-    !webhookSecret && "FLW_WEBHOOK_SECRET_HASH",\n    !apiBase && "FLW_API_BASE_URL",
+    !webhookSecret && "FLW_WEBHOOK_SECRET_HASH",
+    !apiBase && "FLW_API_BASE_URL",
   ].filter(Boolean);
 
   if (missing.length) {
