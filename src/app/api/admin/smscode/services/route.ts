@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
     const now = new Date().toISOString();
     const serviceMap = new Map<string, {
       service_key: string; display_name: string; sms_code_service_code: string;
-      supported: boolean; last_verified_at: string; verification_note: string; updated_at: string;
+      supported: boolean; active: boolean; last_verified_at: string; verification_note: string; updated_at: string;
     }>();
     for (const service of services) {
       const serviceKey = keyFor(service.name);
@@ -72,6 +72,7 @@ export async function POST(request: NextRequest) {
         display_name: service.name,
         sms_code_service_code: service.code,
         supported: true,
+        active: false,
         last_verified_at: now,
         verification_note: `Confirmed active in the live SMSCode catalogue for ${country.name}.`,
         updated_at: now,
@@ -80,9 +81,20 @@ export async function POST(request: NextRequest) {
     const serviceRows = [...serviceMap.values()];
 
     stage = "save_services";
+    const { data: existingServices, error: existingServicesError } = await auth.service
+      .from("smscode_service_catalogue")
+      .select("service_key,active")
+      .in("service_key", serviceRows.map((row) => row.service_key));
+    if (existingServicesError) throw existingServicesError;
+    const activeByKey = new Map((existingServices ?? []).map((row) => [row.service_key, row.active]));
+    const serviceRowsToSave = serviceRows.map((row) => ({
+      ...row,
+      // Catalogue refreshes must never silently disable a service an admin enabled.
+      active: activeByKey.get(row.service_key) ?? false,
+    }));
     const { error: serviceError } = await auth.service
       .from("smscode_service_catalogue")
-      .upsert(serviceRows, { onConflict: "service_key", ignoreDuplicates: false });
+      .upsert(serviceRowsToSave, { onConflict: "service_key", ignoreDuplicates: false });
     if (serviceError) throw serviceError;
 
     const { data: storedServices, error: readError } = await auth.service
