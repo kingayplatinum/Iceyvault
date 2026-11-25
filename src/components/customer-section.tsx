@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowUpRight, CheckCircle2, Clock3, RefreshCw, ShieldCheck, Wallet, MapPin, Save, ShoppingBag } from "lucide-react";
 
 type Profile = {
@@ -19,7 +19,7 @@ type D = {
   transactions?: Transaction[];
   email?: string;
 };
-type C = { services: Array<{ id: string; display_name: string }>; tiers: Array<{ id: string; service_id: string; tier_label: string; country_iso2: string; retail_price_kobo: number; last_inventory_count: number | null }> };
+type C = { services: Array<{ id: string; display_name: string }>; tiers: Array<{ id: string; service_id: string; tier_label: string; country_iso2: string; country_name?: string | null; retail_price_kobo: number; last_inventory_count: number | null }> };
 const pages: Record<string, { title: string; description: string }> = {
   catalog: { title: "Browse services", description: "Choose a verified service and a live, available number." },
   orders: { title: "My orders", description: "Track your number activations and order history." },
@@ -44,7 +44,16 @@ export default function CustomerSection({ section }: { section: string }) {
   const [fundAmount, setFundAmount] = useState("1000");
   const [buying, setBuying] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [lastOrderId, setLastOrderId] = useState<string | null>(null);
+  const [lastOrderId, setLastOrderId] = useState<string | null>(null);\n  const [catalogCountry, setCatalogCountry] = useState("US");\n  const [catalogService, setCatalogService] = useState("");\n  const [catalogProduct, setCatalogProduct] = useState("");
+
+  const catalogCountries = useMemo(() => Array.from(new Map(c.tiers.map(t => [t.country_iso2, { code: t.country_iso2, name: t.country_name || t.country_iso2 }])).values()).sort((a,b) => {
+    const rank = (code: string) => code === "US" ? 0 : code === "GB" ? 1 : 2;
+    return rank(a.code) - rank(b.code) || a.name.localeCompare(b.name);
+  }), [c.tiers]);
+  const countryProducts = useMemo(() => c.tiers.filter(t => t.country_iso2 === catalogCountry), [c.tiers, catalogCountry]);
+  const countryServices = useMemo(() => c.services.filter(s => countryProducts.some(t => t.service_id === s.id)), [c.services, countryProducts]);
+  const serviceProducts = useMemo(() => countryProducts.filter(t => t.service_id === catalogService), [countryProducts, catalogService]);
+  const selectedCatalogProduct = c.tiers.find(t => t.id === catalogProduct) || null;
 
   async function load() {
     try {
@@ -69,6 +78,21 @@ export default function CustomerSection({ section }: { section: string }) {
   }
 
   useEffect(() => { void load(); }, [section]);
+  useEffect(() => {
+    if (!catalogCountries.some(country => country.code === catalogCountry) && catalogCountries.length) {
+      setCatalogCountry(catalogCountries[0].code);
+    }
+  }, [catalogCountries, catalogCountry]);
+  useEffect(() => {
+    if (!countryServices.some(service => service.id === catalogService)) {
+      setCatalogService(countryServices[0]?.id || "");
+    }
+  }, [countryServices, catalogService]);
+  useEffect(() => {
+    if (!serviceProducts.some(product => product.id === catalogProduct)) {
+      setCatalogProduct(serviceProducts[0]?.id || "");
+    }
+  }, [serviceProducts, catalogProduct]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -294,17 +318,22 @@ export default function CustomerSection({ section }: { section: string }) {
 
       {section === "catalog" ? (
         <section className="workspace-panel">
-          <div className="workspace-section-title"><div><h2>Available number services</h2><p>Only supplier-verified products with stock and approved retail pricing are shown.</p></div><span className="workspace-count">{c.tiers.length}</span></div>
+          <div className="workspace-section-title"><div><h2>Choose your number</h2><p>Select a country, service and available supplier product. Only verified products with stock and approved retail pricing are shown.</p></div><span className="workspace-count">{c.tiers.length}</span></div>
           {loading ? <Empty text="Checking verified catalogue…"/> : c.tiers.length ? (
-            <div className="workspace-product-grid">{c.tiers.map((t) => (
-              <article className="workspace-product-card" key={t.id}>
-                <div className="workspace-product-top"><span className="workspace-product-icon"><ShoppingBag size={19}/></span><span className="workspace-stock">{t.last_inventory_count ?? 0} in stock</span></div>
-                <span className="workspace-product-country">{t.country_iso2}</span>
-                <h3>{c.services.find((s) => s.id === t.service_id)?.display_name || "Service"}</h3>
-                <p>{t.tier_label}</p>
-                <div className="workspace-product-bottom"><strong>{money(t.retail_price_kobo)}</strong><button className="workspace-primary" disabled={buying || (t.last_inventory_count ?? 0) < 1} onClick={() => void buyNumber(t.id)}>{buying ? "Processing…" : "Buy number"}</button></div>
-              </article>
-            ))}</div>
+            <div className="workspace-catalogue-picker">
+              <label className="workspace-field"><span>Country</span><select className="workspace-input" value={catalogCountry} onChange={e=>{setCatalogCountry(e.target.value);setCatalogService("");setCatalogProduct("");}}>{catalogCountries.map(country=><option key={country.code} value={country.code}>{country.name} ({country.code})</option>)}</select></label>
+              <label className="workspace-field"><span>Service</span><select className="workspace-input" value={catalogService} onChange={e=>{setCatalogService(e.target.value);setCatalogProduct("");}}><option value="">Choose a service</option>{countryServices.map(service=><option key={service.id} value={service.id}>{service.display_name}</option>)}</select></label>
+              <label className="workspace-field"><span>Number type / product</span><select className="workspace-input" value={catalogProduct} onChange={e=>setCatalogProduct(e.target.value)}><option value="">Choose a product</option>{serviceProducts.map(product=><option key={product.id} value={product.id}>{product.tier_label} · {money(product.retail_price_kobo)} · {product.last_inventory_count??0} in stock</option>)}</select></label>
+              {selectedCatalogProduct ? (
+                <article className="workspace-product-card workspace-selected-product">
+                  <div className="workspace-product-top"><span className="workspace-product-icon"><ShoppingBag size={19}/></span><span className="workspace-stock">{selectedCatalogProduct.last_inventory_count??0} in stock</span></div>
+                  <span className="workspace-product-country">{selectedCatalogProduct.country_name||selectedCatalogProduct.country_iso2}</span>
+                  <h3>{c.services.find(service=>service.id===selectedCatalogProduct.service_id)?.display_name||"Service"}</h3>
+                  <p>{selectedCatalogProduct.tier_label}</p>
+                  <div className="workspace-product-bottom"><strong>{money(selectedCatalogProduct.retail_price_kobo)}</strong><button className="workspace-primary" disabled={buying||(selectedCatalogProduct.last_inventory_count??0)<1} onClick={()=>void buyNumber(selectedCatalogProduct.id)}>{buying?"Processing…":"Buy number"}</button></div>
+                </article>
+              ) : <Empty text="No verified products are available for this country and service yet. Choose another option or check back after the supplier catalogue is refreshed."/>}
+            </div>
           ) : <Empty text="No verified products are published yet. The supplier catalogue must be synced, priced and activated by an administrator first."/>}
           {lastOrderId ? <p className="workspace-inline-link"><Link href={"/dashboard/orders/" + lastOrderId}>View your new order <ArrowUpRight size={15}/></Link></p> : null}
         </section>
