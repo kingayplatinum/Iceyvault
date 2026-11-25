@@ -50,7 +50,7 @@ const profileSchema = z.object({
   billing_address_line1: z.string().trim().max(160).nullable().optional(),
   billing_city: z.string().trim().max(80).nullable().optional(),
   billing_state: z.string().trim().max(80).nullable().optional(),
-  billing_postal_code: z.string().trim().max(20).nullable().optional(),
+  billing_postal_code: z.string().trim().min(2, "Enter a valid postal code or leave it blank.").max(20).nullable().optional(),
   billing_country: z.string().trim().length(2).default("NG"),
 });
 
