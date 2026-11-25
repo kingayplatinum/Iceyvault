@@ -1,5 +1,5 @@
 export const dynamic = "force-dynamic";
-import Link from "next/link";
+import Link from "next/link";\nimport Image from "next/image";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -30,7 +30,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <div className="workspace-shell">
       <aside className="workspace-sidebar">
-        <Link href="/" className="workspace-brand">icey<span>vault</span></Link>
+        <Link href="/" className="workspace-brand" aria-label="IceyVault home"><Image src="/iceyvault-logo.webp" alt="IceyVault" width={240} height={65} priority /></Link>
         <div className="workspace-sidebar-caption">CUSTOMER WORKSPACE</div>
         <nav aria-label="Main navigation">
           {nav.map(([label, href, Icon]) => (
