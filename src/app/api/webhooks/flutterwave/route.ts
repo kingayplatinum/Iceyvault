@@ -13,41 +13,59 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 export async function POST(request: NextRequest) {
-  const secret = process.env.FLW_WEBHOOK_SECRET_HASH;
+  const secretHash = process.env.FLW_WEBHOOK_SECRET_HASH;
   const rawBody = await request.text();
-  const signature = request.headers.get("verif-hash") || "";
-  if (!secret || !signature || !safeEqual(signature, secret)) {
-    return new NextResponse("Unauthorized", { status: 401 });
-  }
+  const signature = request.headers.get("flutterwave-signature") || "";
+  const legacyHash = request.headers.get("verif-hash") || "";
+
+  if (!secretHash) return new NextResponse("Webhook secret is not configured", { status: 503 });
+  const expectedSignature = createHmac("sha256", secretHash).update(rawBody).digest("base64");
+  const signatureValid = signature
+    ? safeEqual(signature, expectedSignature)
+    : Boolean(legacyHash && safeEqual(legacyHash, secretHash));
+  if (!signatureValid) return new NextResponse("Unauthorized", { status: 401 });
 
   let payload: {
+    type?: string;
     event?: string;
-    data?: { id?: string | number; reference?: string; status?: string; tx_ref?: string };
+    data?: { id?: string | number; reference?: string; tx_ref?: string; status?: string };
   } | null = null;
-  try { payload = JSON.parse(rawBody); } catch { return new NextResponse("Invalid JSON", { status: 400 }); }
-  if (!payload?.event || !payload.data) return new NextResponse("Invalid payload", { status: 400 });
-  if (payload.event !== "charge.completed") return NextResponse.json({ received: true });
+  try {
+    payload = JSON.parse(rawBody);
+  } catch {
+    return new NextResponse("Invalid JSON", { status: 400 });
+  }
+  if (!payload?.data) return new NextResponse("Invalid payload", { status: 400 });
+
+  const eventType = payload.type || payload.event;
+  if (eventType !== "charge.completed") return NextResponse.json({ received: true });
 
   const reference = payload.data.tx_ref || payload.data.reference;
-  const providerId = payload.data.id == null ? null : String(payload.data.id);
-  if (!reference || !providerId) return NextResponse.json({ received: true, matched: false });
+  if (!reference) return NextResponse.json({ received: true, matched: false });
 
+  const providerId = payload.data.id == null ? null : String(payload.data.id);
   const service = createServiceClient();
   const { data: payment, error } = await service.from("payment_transactions")
     .select("id,gateway_transaction_id,gateway_reference")
     .eq("gateway", "flutterwave")
     .eq("gateway_reference", reference)
     .maybeSingle();
+
   if (error) return new NextResponse("Could not locate payment", { status: 500 });
   if (!payment) return NextResponse.json({ received: true, matched: false });
-  if (payment.gateway_transaction_id && payment.gateway_transaction_id !== providerId) {
+  if (payment.gateway_transaction_id && providerId && /^\\d+$/.test(providerId) &&
+      payment.gateway_transaction_id !== providerId) {
     return new NextResponse("Provider transaction mismatch", { status: 409 });
   }
 
   try {
-    await verifyAndCreditWalletPayment(payment.id, providerId);
+    // V3 Standard uses numeric transaction IDs. Newer webhook payloads can expose
+    // charge IDs instead, so the verifier falls back to the unique tx_ref.
+    await verifyAndCreditWalletPayment(payment.id, providerId && /^\\d+$/.test(providerId) ? providerId : null);
     return NextResponse.json({ received: true, matched: true });
   } catch {
+    // A non-200 response asks Flutterwave to retry; the wallet remains uncredited
+    // until the authoritative V3 verification and atomic settlement succeed.
     return new NextResponse("Payment verification pending", { status: 503 });
   }
 }
