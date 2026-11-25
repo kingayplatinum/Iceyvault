@@ -47,6 +47,9 @@ export async function POST(request: NextRequest) {
     if (existing.amount_kobo !== parsed.data.amountKobo) {
       return NextResponse.json({ error: "This request key was already used for a different amount." }, { status: 409 });
     }
+    if (existing.status !== "pending") {
+      return NextResponse.json({ error: "This payment request is already settled or failed. Start a new funding request." }, { status: 409 });
+    }
     if (existing.checkout_url) return NextResponse.json({ checkoutUrl: existing.checkout_url, reference: existing.gateway_reference, reused: true });
     return NextResponse.json({ error: "This payment request is already being processed. Refresh your wallet in a moment.", reference: existing.gateway_reference }, { status: 202 });
   }
