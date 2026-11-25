@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";\nimport Image from "next/image";
+import Link from "next/link";
+import Image from "next/image";
 import {
   ArrowDownToLine, ArrowRight, ArrowUpRight, BadgeCheck, Check, ChevronDown,
   CircleHelp, Globe2, Headphones, LockKeyhole, Menu, MessageCircle, Search,
