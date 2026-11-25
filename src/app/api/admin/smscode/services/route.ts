@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin/require-admin";
 import { smscodeRequest, SmscodeError } from "@/lib/smscode/client";
 
@@ -15,66 +15,65 @@ type RemoteProduct = {
   operator_name: string | null; available: number; price: Money; active: boolean;
 };
 type ProductPageMeta = { page?: number; limit?: number; count?: number; fx?: { rate?: number } };
-
 const keyFor = (name: string) => name.toLowerCase().normalize("NFKD")
   .replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 64);
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   const auth = await requireAdmin();
   if ("response" in auth) return auth.response;
 
   let stage = "country_catalogue";
-  let currentCountry = "";
-  let currentService = "";
+  let countryName = "";
+  let serviceName = "";
   try {
-    const { data: allCountries } = await smscodeRequest<Country[]>("/catalog/countries");
-    const countries = allCountries.filter((country) =>
+    const body = await request.json().catch(() => ({})) as { mode?: string; countryId?: number };
+    const { data: countries } = await smscodeRequest<Country[]>("/catalog/countries");
+    const activeCountries = countries.filter((country) =>
       country.active && /^[A-Z]{2}$/i.test(country.code) && Number.isFinite(country.id)
     );
-    if (!countries.length) {
+
+    // Lightweight discovery request. The browser then syncs one country per request,
+    // avoiding a single enormous serverless invocation for the entire global catalogue.
+    if (body.mode === "discover") {
       return NextResponse.json({
-        error: "SMSCode returned no active countries. No catalogue records were changed.",
-        stage,
-      }, { status: 409 });
+        countries: activeCountries.map(({ id, code, name, emoji }) => ({ id, code: code.toUpperCase(), name, emoji: emoji ?? null })),
+        count: activeCountries.length,
+      });
     }
 
-    stage = "discover_services";
-    const countryServices: Array<{ country: Country; service: RemoteService; serviceKey: string }> = [];
-    const uniqueServices = new Map<string, {
-      service_key: string; display_name: string; sms_code_service_code: string;
-      supported: boolean; last_verified_at: string; verification_note: string; updated_at: string;
-    }>();
-
-    for (const country of countries) {
-      currentCountry = country.name;
-      const { data } = await smscodeRequest<RemoteService[]>(
-        `/catalog/services?country_id=${country.id}`
-      );
-      for (const service of data.filter((item) => item.active && item.code && item.name)) {
-        const serviceKey = keyFor(service.name);
-        if (!serviceKey) continue;
-        countryServices.push({ country, service, serviceKey });
-        uniqueServices.set(serviceKey, {
-          service_key: serviceKey,
-          display_name: service.name,
-          sms_code_service_code: service.code,
-          supported: true,
-          last_verified_at: new Date().toISOString(),
-          verification_note: "Confirmed active in the live SMSCode catalogue.",
-          updated_at: new Date().toISOString(),
-        });
-      }
+    const country = activeCountries.find((item) => item.id === Number(body.countryId));
+    if (!country) {
+      return NextResponse.json({ error: "The selected country is not active in the live SMSCode catalogue.", stage }, { status: 409 });
     }
+    countryName = country.name;
 
-    if (!countryServices.length) {
+    stage = "country_services";
+    const { data: remoteServices } = await smscodeRequest<RemoteService[]>(
+      `/catalog/services?country_id=${country.id}`
+    );
+    const services = remoteServices.filter((service) => service.active && service.code && service.name);
+    if (!services.length) {
       return NextResponse.json({
-        error: "SMSCode returned no active services for its active countries. No products were changed.",
-        stage,
-      }, { status: 409 });
+        country: country.name, servicesSynced: 0, productsSeen: 0,
+        productsInserted: 0, productsRefreshed: 0, note: "No active services are currently listed for this country.",
+      });
     }
+
+    const now = new Date().toISOString();
+    const serviceRows = [...new Map(services.map((service) => {
+      const serviceKey = keyFor(service.name);
+      return [serviceKey, {
+        service_key: serviceKey,
+        display_name: service.name,
+        sms_code_service_code: service.code,
+        supported: true,
+        last_verified_at: now,
+        verification_note: `Confirmed active in the live SMSCode catalogue for ${country.name}.`,
+        updated_at: now,
+      }];
+    }).filter(([key]) => Boolean(key))).values()];
 
     stage = "save_services";
-    const serviceRows = [...uniqueServices.values()];
     const { error: serviceError } = await auth.service
       .from("smscode_service_catalogue")
       .upsert(serviceRows, { onConflict: "service_key", ignoreDuplicates: false });
@@ -91,36 +90,31 @@ export async function POST() {
     let productsInserted = 0;
     let productsRefreshed = 0;
     let servicesWithStock = 0;
-    let countryServicePairsSynced = 0;
 
-    for (const entry of countryServices) {
-      const { country, service, serviceKey } = entry;
-      currentCountry = country.name;
-      currentService = service.name;
+    for (const remoteService of services) {
+      serviceName = remoteService.name;
+      const serviceKey = keyFor(remoteService.name);
       const stored = serviceByKey.get(serviceKey);
       if (!stored) continue;
 
       let page = 1;
       let expectedCount = Number.POSITIVE_INFINITY;
       let serviceHasStock = false;
-
       while ((page - 1) * 1000 < expectedCount) {
-        stage = `products:${country.code}:${service.code}:page:${page}`;
+        stage = `products:${country.code}:${remoteService.code}:page:${page}`;
         const params = new URLSearchParams({
           country_id: String(country.id),
-          platform_id: String(service.id),
+          platform_id: String(remoteService.id),
           limit: "1000",
           page: String(page),
         });
-        const remoteProducts = await smscodeRequest<RemoteProduct[]>(
-          `/catalog/products?${params.toString()}`
-        );
-        const meta = (remoteProducts.meta ?? {}) as ProductPageMeta;
+        const response = await smscodeRequest<RemoteProduct[]>(`/catalog/products?${params.toString()}`);
+        const meta = (response.meta ?? {}) as ProductPageMeta;
         expectedCount = Number.isFinite(meta.count)
           ? Number(meta.count)
-          : (page - 1) * 1000 + remoteProducts.data.length;
+          : (page - 1) * 1000 + response.data.length;
 
-        const validProducts = remoteProducts.data.filter((product) =>
+        const products = response.data.filter((product) =>
           product.active && Number.isFinite(product.id) &&
           Number.isFinite(product.available) &&
           product.price?.currency === "USD" &&
@@ -128,22 +122,18 @@ export async function POST() {
           product.price.canonical_currency === "IDR" &&
           Number.isFinite(product.price.canonical_amount)
         );
+        productsSeen += products.length;
+        if (products.some((product) => product.available > 0)) serviceHasStock = true;
 
-        productsSeen += validProducts.length;
-        if (validProducts.some((product) => product.available > 0)) serviceHasStock = true;
-
-        const now = new Date().toISOString();
-        const tierRows = validProducts.map((product) => ({
+        const verifiedAt = new Date().toISOString();
+        const rows = products.map((product) => ({
           service_id: stored.id,
           tier_key: String(product.id),
-          tier_label: product.operator_name
-            ? `${product.name} · ${product.operator_name}`
-            : product.name,
+          tier_label: product.operator_name ? `${product.name} · ${product.operator_name}` : product.name,
           country_iso2: country.code.toUpperCase(),
           country_name: country.name,
           smscode_product_id: String(product.id),
-          smscode_catalog_product_id: product.catalog_product_id == null
-            ? null : String(product.catalog_product_id),
+          smscode_catalog_product_id: product.catalog_product_id == null ? null : String(product.catalog_product_id),
           smscode_operator_id: product.operator_id ?? null,
           max_supplier_price_usd: Number(product.price.amount),
           retail_price_kobo: 0,
@@ -152,12 +142,12 @@ export async function POST() {
           last_supplier_price_idr: product.price.canonical_amount,
           last_supplier_fx_rate: Number(meta.fx?.rate) || null,
           last_inventory_count: Math.max(0, product.available),
-          last_verified_at: now,
-          updated_at: now,
+          last_verified_at: verifiedAt,
+          updated_at: verifiedAt,
         }));
 
-        if (tierRows.length) {
-          stage = `save_products:${country.code}:${service.code}:page:${page}`;
+        if (rows.length) {
+          stage = `save_products:${country.code}:${remoteService.code}:page:${page}`;
           const { data: existing, error: existingError } = await auth.service
             .from("smscode_product_tiers")
             .select("id,tier_key")
@@ -165,7 +155,7 @@ export async function POST() {
             .eq("country_iso2", country.code.toUpperCase());
           if (existingError) throw existingError;
           const existingByKey = new Map((existing ?? []).map((tier) => [tier.tier_key, tier.id]));
-          const newRows = tierRows.filter((tier) => !existingByKey.has(tier.tier_key));
+          const newRows = rows.filter((row) => !existingByKey.has(row.tier_key));
           if (newRows.length) {
             const { error } = await auth.service.from("smscode_product_tiers").upsert(newRows, {
               onConflict: "service_id,tier_key,country_iso2",
@@ -174,24 +164,23 @@ export async function POST() {
             if (error) throw error;
             productsInserted += newRows.length;
           }
-
-          const refreshRows = tierRows.filter((tier) => existingByKey.has(tier.tier_key));
+          const refreshRows = rows.filter((row) => existingByKey.has(row.tier_key));
           for (let index = 0; index < refreshRows.length; index += 20) {
             const batch = refreshRows.slice(index, index + 20);
-            const results = await Promise.all(batch.map((tier) =>
+            const results = await Promise.all(batch.map((row) =>
               auth.service.from("smscode_product_tiers").update({
-                tier_label: tier.tier_label,
-                country_name: tier.country_name,
-                smscode_product_id: tier.smscode_product_id,
-                smscode_catalog_product_id: tier.smscode_catalog_product_id,
-                smscode_operator_id: tier.smscode_operator_id,
-                last_supplier_price_usd: tier.last_supplier_price_usd,
-                last_supplier_price_idr: tier.last_supplier_price_idr,
-                last_supplier_fx_rate: tier.last_supplier_fx_rate,
-                last_inventory_count: tier.last_inventory_count,
-                last_verified_at: tier.last_verified_at,
-                updated_at: now,
-              }).eq("id", existingByKey.get(tier.tier_key))
+                tier_label: row.tier_label,
+                country_name: row.country_name,
+                smscode_product_id: row.smscode_product_id,
+                smscode_catalog_product_id: row.smscode_catalog_product_id,
+                smscode_operator_id: row.smscode_operator_id,
+                last_supplier_price_usd: row.last_supplier_price_usd,
+                last_supplier_price_idr: row.last_supplier_price_idr,
+                last_supplier_fx_rate: row.last_supplier_fx_rate,
+                last_inventory_count: row.last_inventory_count,
+                last_verified_at: row.last_verified_at,
+                updated_at: verifiedAt,
+              }).eq("id", existingByKey.get(row.tier_key))
             ));
             const failed = results.find((result) => result.error);
             if (failed?.error) throw failed.error;
@@ -199,23 +188,20 @@ export async function POST() {
           }
         }
 
-        if (remoteProducts.data.length < 1000) break;
+        if (response.data.length < 1000) break;
         page += 1;
       }
-
       if (serviceHasStock) servicesWithStock++;
-      countryServicePairsSynced++;
     }
 
     stage = "audit_log";
     const { error: auditError } = await auth.service.from("audit_logs").insert({
       actor_user_id: auth.user.id,
-      action: "smscode_full_catalogue_synced",
+      action: "smscode_country_catalogue_synced",
       entity_type: "smscode_product_tiers",
       metadata: {
-        countries: countries.length,
-        country_service_pairs: countryServicePairsSynced,
-        unique_services: serviceRows.length,
+        country: country.code.toUpperCase(),
+        services: services.length,
         products_seen: productsSeen,
         products_inserted: productsInserted,
         products_refreshed: productsRefreshed,
@@ -224,14 +210,14 @@ export async function POST() {
     if (auditError) throw auditError;
 
     return NextResponse.json({
-      countriesSynced: countries.length,
-      servicesSynced: serviceRows.length,
-      countryServicePairsSynced,
+      country: country.name,
+      countryCode: country.code.toUpperCase(),
+      servicesSynced: services.length,
       productsSeen,
       productsInserted,
       productsRefreshed,
       servicesWithStock,
-      note: "All imported supplier products remain inactive and have zero NGN retail price until reviewed and configured. Existing retail prices, supplier caps and activation states were preserved during refresh.",
+      note: "Imported products remain inactive with zero NGN retail price. Existing retail prices, supplier caps and activation states are preserved when refreshing the catalogue.",
     });
   } catch (error) {
     const supplierError = error as Error & { status?: number; code?: string; requestId?: string };
@@ -239,16 +225,16 @@ export async function POST() {
     return NextResponse.json({
       error: supplierError.message || "Could not synchronise the SMSCode catalogue.",
       stage,
-      country: currentCountry || null,
-      service: currentService || null,
+      country: countryName || null,
+      service: serviceName || null,
       supplierStatus: isSupplierError ? supplierError.status : null,
       supplierCode: isSupplierError ? supplierError.code ?? null : null,
       supplierRequestId: isSupplierError ? supplierError.requestId ?? null : null,
-      hint: stage === "country_catalogue" || stage === "discover_services"
-        ? "Check the live SMSCode country and service catalogue and the supplier API token."
+      hint: stage === "country_catalogue" || stage === "country_services"
+        ? "Check the SMSCode live country/service catalogue and supplier API token."
         : stage.startsWith("products:")
           ? "The supplier product endpoint failed for the indicated country/service. Use the request ID when contacting SMSCode."
-          : "The supplier response was received, but saving catalogue data failed. Check service_role table grants, RLS and database constraints.",
+          : "The supplier response was received, but saving catalogue data failed. Check service_role grants, RLS and database constraints.",
     }, { status: 502 });
   }
 }
