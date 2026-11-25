@@ -108,6 +108,7 @@ export async function POST(request: NextRequest) {
         currency: "NGN",
         reference,
         customer: {
+          address,
           email: user.email,
           name: { first, last },
           ...(phoneDigits.length >= 7 && phoneDigits.length <= 10
