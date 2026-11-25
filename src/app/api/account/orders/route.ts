@@ -152,7 +152,9 @@ export async function POST(request: NextRequest) {
       headers: { "Idempotency-Key": orderId },
       body: JSON.stringify({ catalog_product_id: catalogProductId, max_price: cap.toFixed(4), quantity: 1 }),
     });
-    supplierOrder = result.data.orders?.[0];\n    const fx = result.meta as { fx?: { rate?: number; rate_as_of?: string | null } } | undefined;\n    supplierFxRate = Number(fx?.fx?.rate) || null;\n    supplierFxAsOf = fx?.fx?.rate_as_of ?? null;
+    supplierOrder = result.data.orders?.[0];
+    const fx = result.meta as { fx?: { rate?: number; rate_as_of?: string | null } } | undefined;\n    supplierFxRate = Number(fx?.fx?.rate) || null;
+    supplierFxAsOf = fx?.fx?.rate_as_of ?? null;
     if (!supplierOrder) {
       await service.rpc("refund_failed_smscode_order", { p_order_id: orderId, p_reason: "SMSCode returned no successful order" });
       return fail("The supplier could not fulfil this number. Your wallet has been refunded.", 502);
