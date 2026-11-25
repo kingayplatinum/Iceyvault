@@ -45,7 +45,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       </aside>
 
       <header className="workspace-mobile-header">
-        <Link href="/" className="workspace-brand">icey<span>vault</span></Link>
+        <Link href="/" className="workspace-brand" aria-label="IceyVault home"><Image src="/iceyvault-logo.webp" alt="IceyVault" width={240} height={65} priority /></Link>
         <details className="workspace-mobile-more">
           <summary aria-label="More account options"><MoreHorizontal size={22}/></summary>
           <div className="workspace-mobile-menu">
