@@ -110,7 +110,7 @@ export default function CustomerSection({ section }: { section: string }) {
         }),
       });
       const j = await r.json();
-      setNotice(r.ok ? "Your account and billing details have been saved." : j.error || "Could not save your details.");
+      setNotice(r.ok ? "Your account details have been saved." : j.error || "Could not save your details.");
       if (r.ok) await load();
     } catch {
       setNotice("Could not reach the account service. Please try again.");
@@ -121,12 +121,21 @@ export default function CustomerSection({ section }: { section: string }) {
 
   async function changePassword(e: React.FormEvent) {
     e.preventDefault();
-    const r = await fetch("/api/account/password", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password }),
-    });
-    const j = await r.json();
-    setNotice(r.ok ? "Password updated successfully." : j.error || "Could not update password.");
-    if (r.ok) setPassword("");
+    setSaving(true);
+    try {
+      const r = await fetch("/api/account/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      const j = await r.json();
+      setNotice(r.ok ? "Password updated successfully." : j.error || "Could not update password.");
+      if (r.ok) setPassword("");
+    } catch {
+      setNotice("Could not reach the password service. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function fundWallet() {
@@ -278,7 +287,7 @@ export default function CustomerSection({ section }: { section: string }) {
           </section>
           <section className="workspace-panel">
             <div className="workspace-section-title"><div><h2>Password & security</h2><p>Choose a strong password you don&apos;t use elsewhere.</p></div><ShieldCheck className="workspace-purple-icon"/></div>
-            <form onSubmit={(e) => void changePassword(e)} className="workspace-password-form"><label className="workspace-field"><span>New password</span><input className="workspace-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={10} required placeholder="At least 10 characters"/></label><button className="workspace-secondary">Update password</button></form>
+            <form onSubmit={(e) => void changePassword(e)} className="workspace-password-form"><label className="workspace-field"><span>New password</span><input className="workspace-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={10} required placeholder="At least 10 characters"/></label><button className="workspace-secondary" disabled={saving}>{saving ? "Updating…" : "Update password"}</button></form>
           </section>
         </>
       ) : null}
