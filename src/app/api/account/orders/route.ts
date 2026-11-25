@@ -274,7 +274,8 @@ export async function POST(request: NextRequest) {
     await service.from("orders").update({ number_id: numberRow.id, status: "review_required", updated_at: new Date().toISOString() }).eq("id", orderId);
     return NextResponse.json({ orderId, status: "review_required", message: "The number was purchased, but supplier cost accounting needs administrator reconciliation." }, { status: 202 });
   }
-\n  const status = supplierOrder.status === "OTP_RECEIVED" ? "waiting_message" : "active";
+
+  const status = supplierOrder.status === "OTP_RECEIVED" ? "waiting_message" : "active";
   const { error: orderUpdateError } = await service.from("orders").update({
     number_id: numberRow.id, status, expires_at: supplierOrder.expires_at ?? null, fulfilled_at: new Date().toISOString(), updated_at: new Date().toISOString(),
   }).eq("id", orderId);
