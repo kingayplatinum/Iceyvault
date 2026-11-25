@@ -263,3 +263,8 @@
  .admin-mobile-nav>a:active,.admin-mobile-nav>a:focus{color:#6d5bd0}
  .admin-mobile-nav svg{color:#7866d7}
 }
+
+.admin-selected-product{grid-column:1/-1;display:grid;gap:5px;padding:14px 15px;border:1px solid #ded8fa;border-radius:11px;background:linear-gradient(120deg,#fff 0%,#f7f5ff 100%)}
+.admin-selected-product b{font-size:12px;color:#242334}
+.admin-selected-product small{font-size:10px;color:#7b8495}
+.admin-product-empty{grid-column:1/-1}
