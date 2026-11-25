@@ -140,8 +140,8 @@ export default function CustomerSection({ section }: { section: string }) {
 
   async function fundWallet() {
     const amountKobo = Math.round(Number(fundAmount) * 100);
-    if (!Number.isFinite(amountKobo) || amountKobo < 5000 || amountKobo > 50000000) {
-      setNotice("Enter an amount between ₦50 and ₦500,000.");
+    if (!Number.isFinite(amountKobo) || amountKobo < 5000 || amountKobo > 50000000 || amountKobo % 100 !== 0) {
+      setNotice("Enter a whole-naira amount between ₦50 and ₦500,000.");
       return;
     }
     setBuying(true);
@@ -250,7 +250,7 @@ export default function CustomerSection({ section }: { section: string }) {
             <div className="workspace-fund-row">
               <label className="workspace-field workspace-fund-input">
                 <span>Amount to add (NGN)</span>
-                <div className="workspace-currency-input"><span>₦</span><input className="workspace-input" type="number" min="50" max="500000" step="50" value={fundAmount} onChange={(e) => setFundAmount(e.target.value)} /></div>
+                <div className="workspace-currency-input"><span>₦</span><input className="workspace-input" type="number" min="50" max="500000" step="1" value={fundAmount} onChange={(e) => setFundAmount(e.target.value)} /></div>
               </label>
               <button className="workspace-primary workspace-fund-button" onClick={() => void fundWallet()} disabled={buying || saving}>
                 {buying ? "Preparing checkout…" : "Continue to payment"} <ArrowUpRight size={17}/>
