@@ -21,18 +21,25 @@ export async function verifyAndCreditWalletPayment(paymentId: string, providerTr
   if (payment.status === "successful") return { credited: false, status: "successful" };
   if (payment.status !== "pending") return { credited: false, status: payment.status };
 
-  const transactionId = providerTransactionId || payment.gateway_transaction_id;
-  if (!transactionId) return { credited: false, status: "pending" };
-  if (payment.gateway_transaction_id && String(payment.gateway_transaction_id) !== String(transactionId)) {
+  const suppliedId = providerTransactionId || payment.gateway_transaction_id;
+  if (payment.gateway_transaction_id && suppliedId && String(payment.gateway_transaction_id) !== String(suppliedId)) {
     throw new Error("FLUTTERWAVE_TRANSACTION_ID_MISMATCH");
   }
 
   const secretKey = process.env.FLW_SECRET_KEY;
   if (!secretKey) throw new Error("FLW_SECRET_KEY is not configured.");
-  const response = await fetch(
-    `https://api.flutterwave.com/v3/transactions/${encodeURIComponent(String(transactionId))}/verify`,
-    { method: "GET", headers: { Authorization: `Bearer ${secretKey}`, Accept: "application/json" }, cache: "no-store", signal: AbortSignal.timeout(15_000) },
-  );
+  // The hosted checkout redirect normally includes transaction_id. If a browser
+  // closes early or a newer webhook uses a non-numeric charge ID, verify by tx_ref.
+  const numericId = suppliedId && /^\\d+$/.test(String(suppliedId)) ? String(suppliedId) : null;
+  const verifyUrl = numericId
+    ? `https://api.flutterwave.com/v3/transactions/${encodeURIComponent(numericId)}/verify`
+    : `https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${encodeURIComponent(payment.gateway_reference)}`;
+  const response = await fetch(verifyUrl, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${secretKey}`, Accept: "application/json" },
+    cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
+  });
   const payload = await response.json().catch(() => null) as V3Envelope | null;
   if (!response.ok || payload?.status !== "success" || !payload.data) {
     throw new Error(payload?.message || `Flutterwave transaction verification failed (${response.status}).`);
@@ -40,7 +47,7 @@ export async function verifyAndCreditWalletPayment(paymentId: string, providerTr
 
   const transaction = payload.data;
   if (
-    String(transaction.id) !== String(transactionId) ||
+    (numericId !== null && String(transaction.id) !== numericId) ||
     transaction.tx_ref !== payment.gateway_reference ||
     transaction.currency !== "NGN" ||
     !Number.isFinite(Number(transaction.amount)) ||
