@@ -63,8 +63,8 @@ export async function POST(request: NextRequest) {
   const orderId = reservation.order_id as string;
 
   const [{ data: existingProviderOrder, error: existingProviderError }, { data: existingLocalOrder, error: existingLocalError }] = await Promise.all([
-    service.from("provider_orders").select("provider_order_ref,status").eq("order_id", orderId).maybeSingle(),
-    service.from("orders").select("number_id,status").eq("id", orderId).maybeSingle(),
+    service.from("provider_orders").select("id,provider_id,provider_order_ref,status").eq("order_id", orderId).maybeSingle(),
+    service.from("orders").select("number_id,status,smscode_tier_id").eq("id", orderId).maybeSingle(),
   ]);
   if (existingProviderError || existingLocalError || !existingLocalOrder) {
     return fail("Could not safely verify the current order state. No new supplier request was sent.", 503);
@@ -73,8 +73,61 @@ export async function POST(request: NextRequest) {
     if (existingLocalOrder.number_id) {
       return NextResponse.json({ orderId, status: existingLocalOrder.status, alreadyProcessed: true });
     }
-    await service.from("orders").update({ status: "review_required", updated_at: new Date().toISOString() }).eq("id", orderId);
-    return NextResponse.json({ orderId, status: "review_required", message: "The supplier order already exists, but its number record needs administrator reconciliation. No duplicate supplier order was created." }, { status: 202 });
+    // Recover an interrupted local write by reading the same supplier order; never create a second supplier purchase.
+    try {
+      const live = await smscodeRequest<SupplierOrder>(`/orders/${encodeURIComponent(existingProviderOrder.provider_order_ref)}`);
+      if (!live.data.phone_number || !existingLocalOrder.smscode_tier_id) {
+        await service.from("orders").update({ status: "review_required", updated_at: new Date().toISOString() }).eq("id", orderId);
+        return NextResponse.json({ orderId, status: "review_required", message: "Supplier order exists, but supplier number details are not yet available. No duplicate purchase was created." }, { status: 202 });
+      }
+      const { data: tier } = await service.from("smscode_product_tiers").select("country_iso2,service_id").eq("id", existingLocalOrder.smscode_tier_id).maybeSingle();
+      const { data: serviceRow } = tier ? await service.from("smscode_service_catalogue").select("sms_code_service_code").eq("id", tier.service_id).maybeSingle() : { data: null };
+      const { data: existingNumber } = await service.from("numbers").select("id").eq("provider_id", existingProviderOrder.provider_id).eq("provider_number_ref", String(live.data.id)).maybeSingle();
+      let numberId = existingNumber?.id;
+      if (!numberId) {
+        const { data: recoveredNumber, error: recoverError } = await service.from("numbers").insert({
+          provider_id: existingProviderOrder.provider_id,
+          provider_number_ref: String(live.data.id),
+          e164_ciphertext: encryptPrivateValue(live.data.phone_number),
+          e164_last4: live.data.phone_number.slice(-4),
+          country_iso2: tier?.country_iso2 ?? "NG",
+          service_code: serviceRow?.sms_code_service_code ?? null,
+          channel: "sms",
+          offer_kind: "sms_activation",
+          status: "assigned",
+          provider_metadata: { supplier_order_id: live.data.id, recovered: true },
+        }).select("id").single();
+        if (recoverError || !recoveredNumber) {
+          await service.from("orders").update({ status: "review_required", updated_at: new Date().toISOString() }).eq("id", orderId);
+          return NextResponse.json({ orderId, status: "review_required", message: "Supplier order exists; secure number recovery needs administrator attention." }, { status: 202 });
+        }
+        numberId = recoveredNumber.id;
+      }
+      const { data: ledger } = await service.from("supplier_cost_ledger").select("id").eq("order_id", orderId).maybeSingle();
+      if (!ledger && live.data.amount?.currency === "USD") {
+        const { error: ledgerError } = await service.from("supplier_cost_ledger").insert({
+          order_id: orderId,
+          provider_order_id: existingProviderOrder.id,
+          supplier_code: "smscode",
+          supplier_product_id: String(live.data.product_id),
+          supplier_currency: live.data.amount.canonical_currency,
+          supplier_amount_minor: live.data.amount.canonical_amount,
+          supplier_amount_usd: Number(live.data.amount.amount),
+          customer_revenue_ngn_kobo: reservation.retail_amount_kobo,
+          metadata: { recovered: true, catalog_product_id: live.data.catalog_product_id },
+        });
+        if (ledgerError) {
+          await service.from("orders").update({ number_id: numberId, status: "review_required", updated_at: new Date().toISOString() }).eq("id", orderId);
+          return NextResponse.json({ orderId, status: "review_required", message: "Number recovered; supplier cost accounting still needs reconciliation." }, { status: 202 });
+        }
+      }
+      const recoveredStatus = live.data.status === "OTP_RECEIVED" ? "waiting_message" : "active";
+      await service.from("orders").update({ number_id: numberId, status: recoveredStatus, expires_at: live.data.expires_at ?? null, fulfilled_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", orderId);
+      return NextResponse.json({ orderId, status: recoveredStatus, phoneNumber: live.data.phone_number, recovered: true }, { status: 200 });
+    } catch {
+      await service.from("orders").update({ status: "review_required", updated_at: new Date().toISOString() }).eq("id", orderId);
+      return NextResponse.json({ orderId, status: "review_required", message: "Supplier order exists, but its details could not be retrieved. No duplicate purchase was created." }, { status: 202 });
+    }
   }
 
   const catalogProductId = Number(reservation.catalog_product_id);
