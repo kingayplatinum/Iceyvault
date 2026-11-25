@@ -165,3 +165,5 @@
 .workspace-catalogue-picker>.workspace-field:nth-child(3){grid-column:1/-1}
 .workspace-selected-product{grid-column:1/-1;max-width:620px;margin-top:3px}
 @media(max-width:640px){.workspace-catalogue-picker{grid-template-columns:1fr;gap:13px}.workspace-catalogue-picker>.workspace-field:nth-child(3){grid-column:1}.workspace-selected-product{max-width:none}}
+
+.workspace-brand img{display:block;width:148px;height:auto;object-fit:contain}.workspace-brand span{display:none}
