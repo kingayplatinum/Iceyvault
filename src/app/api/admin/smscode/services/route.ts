@@ -22,7 +22,7 @@ export async function POST() {
     const { data: countries } = await smscodeRequest<Country[]>("/catalog/countries");
     const nigeria = countries.find((country) => country.code.toUpperCase() === "NG" && country.active);
     if (!nigeria) return NextResponse.json({ error: "SMSCode does not currently list Nigeria as an active country. No products were changed." }, { status: 409 });
-    const { data: countryServices } = await smscodeRequest<RemoteService[]>(`/catalog/services?country_id=${nigeria.id}`);
+    stage = "nigeria_services";\n    const { data: countryServices } = await smscodeRequest<RemoteService[]>(`/catalog/services?country_id=${nigeria.id}`);
     const services = countryServices.filter((service) => service.active);
     const serviceRows = services.map((service) => ({
       service_key: keyFor(service.name),
@@ -33,7 +33,7 @@ export async function POST() {
       verification_note: "Confirmed active in the live SMSCode catalogue. Country-specific products are synced separately.",
     })).filter((row) => row.service_key.length > 0);
 
-    const { error: serviceError } = await auth.service
+    stage = "save_services";\n    const { error: serviceError } = await auth.service
       .from("smscode_service_catalogue")
       .upsert(serviceRows, { onConflict: "service_key", ignoreDuplicates: false });
     if (serviceError) throw serviceError;
@@ -50,7 +50,7 @@ export async function POST() {
     let productsRefreshed = 0;
     const failures: string[] = [];
 
-    for (const remoteService of services) {
+    stage = "product_catalogue";\n    for (const remoteService of services) {
       const stored = serviceByCode.get(remoteService.code);
       if (!stored) continue;
       const params = new URLSearchParams({
@@ -59,7 +59,7 @@ export async function POST() {
         limit: "1000",
         page: "1",
       });
-      const remoteProducts = await smscodeRequest<RemoteProduct[]>(`/catalog/products?${params.toString()}`);
+      stage = `products:${remoteService.code}`;\n      const remoteProducts = await smscodeRequest<RemoteProduct[]>(`/catalog/products?${params.toString()}`);
       const validProducts = remoteProducts.data.filter((product) =>
         product.active && Number.isFinite(product.id) && Number.isFinite(product.available) &&
         product.price?.currency === "USD" && Number.isFinite(Number(product.price.amount)) &&
@@ -86,7 +86,7 @@ export async function POST() {
       }));
       if (!tierRows.length) continue;
 
-      const { data: existing, error: existingError } = await auth.service
+      stage = `save_products:${remoteService.code}`;\n      const { data: existing, error: existingError } = await auth.service
         .from("smscode_product_tiers")
         .select("id,tier_key")
         .eq("service_id", stored.id)
@@ -126,7 +126,7 @@ export async function POST() {
       }
     }
 
-    await auth.service.from("audit_logs").insert({
+    stage = "audit_log";\n    await auth.service.from("audit_logs").insert({
       actor_user_id: auth.user.id,
       action: "smscode_nigeria_catalogue_synced",
       entity_type: "smscode_product_tiers",
@@ -142,8 +142,18 @@ export async function POST() {
       note: "Imported products remain inactive with zero retail price. Review supplier caps and NGN retail prices, then verify and activate tiers manually.",
     });
   } catch (error) {
+    const supplierError = error as Error & { status?: number; code?: string; requestId?: string };
     return NextResponse.json({
-      error: error instanceof Error ? error.message : "Could not synchronise the SMSCode catalogue.",
+      error: supplierError.message || "Could not synchronise the SMSCode catalogue.",
+      stage,
+      supplierStatus: supplierError.status ?? null,
+      supplierCode: supplierError.code ?? null,
+      supplierRequestId: supplierError.requestId ?? null,
+      hint: stage === "country_catalogue" || stage === "nigeria_services"
+        ? "Check whether the SMSCode account has Nigeria enabled in its live country catalogue."
+        : stage.startsWith("products:")
+          ? "The supplier product endpoint failed for the indicated platform. Use the request ID when contacting SMSCode."
+          : "The supplier response was received, but saving catalogue data failed. Check database permissions and constraints.",
     }, { status: 502 });
   }
 }
