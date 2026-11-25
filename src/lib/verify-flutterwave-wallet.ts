@@ -2,7 +2,10 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { flutterwaveV4Request } from "@/lib/flutterwave-v4";
 
 type V4Order = {
-  id: string; amount: number; currency: string; reference: string;
+  id: string;
+  amount: number;
+  currency: string;
+  reference: string;
   status: "completed" | "pending" | "authorized" | "partially-completed" | "voided" | "failed";
 };
 
@@ -29,6 +32,7 @@ export async function verifyAndCreditWalletPayment(paymentId: string) {
   if (order.status === "failed" || order.status === "voided") {
     await service.from("payment_transactions").update({
       status: "failed",
+      failure_reason: "Flutterwave order " + order.status,
       raw_event: { provider_order_id: order.id, provider_status: order.status },
       updated_at: new Date().toISOString(),
     }).eq("id", payment.id).eq("status", "pending");
@@ -36,13 +40,20 @@ export async function verifyAndCreditWalletPayment(paymentId: string) {
   }
   if (order.status !== "completed") return { credited: false, status: "pending" };
 
-  const { data: credited, error: creditError } = await service.rpc("credit_wallet_from_verified_payment", {
-    p_payment_id: payment.id,
+  const { data: settlement, error: settlementError } = await service.rpc("settle_flutterwave_payment", {
+    p_tx_ref: payment.gateway_reference,
     p_gateway_transaction_id: order.id,
     p_verified_amount_kobo: Math.round(order.amount * 100),
     p_currency: order.currency,
-    p_verified_payload: { provider_order_id: order.id, status: order.status, amount: order.amount, currency: order.currency, reference: order.reference },
+    p_gateway_status: "successful",
+    p_raw_event: {
+      provider_order_id: order.id,
+      status: order.status,
+      amount: order.amount,
+      currency: order.currency,
+      reference: order.reference,
+    },
   });
-  if (creditError) throw new Error(creditError.message || "WALLET_CREDIT_FAILED");
+  if (settlementError) throw new Error(settlementError.message || "WALLET_SETTLEMENT_FAILED");
   return { credited: settlement?.status === "settled", status: "successful" };
 }
