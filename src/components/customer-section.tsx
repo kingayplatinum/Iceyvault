@@ -326,7 +326,7 @@ export default function CustomerSection({ section }: { section: string }) {
             </div>
           </section>
           <section className="workspace-panel">
-            <div className="workspace-section-title"><div><h2>Password & security</h2><p>Choose a strong password you don't use elsewhere.</p></div><ShieldCheck className="workspace-purple-icon"/></div>
+            <div className="workspace-section-title"><div><h2>Password & security</h2><p>Choose a strong password you don&apos;t use elsewhere.</p></div><ShieldCheck className="workspace-purple-icon"/></div>
             <form onSubmit={(e) => void changePassword(e)} className="workspace-password-form"><label className="workspace-field"><span>New password</span><input className="workspace-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={10} required placeholder="At least 10 characters"/></label><button className="workspace-secondary">Update password</button></form>
           </section>
         </>
