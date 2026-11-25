@@ -7,11 +7,6 @@ import { ArrowUpRight, CheckCircle2, Clock3, RefreshCw, ShieldCheck, Wallet, Map
 type Profile = {
   display_name: string | null;
   phone_e164: string | null;
-  billing_address_line1: string | null;
-  billing_city: string | null;
-  billing_state: string | null;
-  billing_postal_code: string | null;
-  billing_country: string | null;
 };
 type Transaction = { id: string; direction: string; amount_kobo: number; description: string | null; created_at: string };
 type Order = { id: string; status: string; retail_amount_kobo: number; created_at: string; offer_kind: string };
@@ -25,8 +20,6 @@ type D = {
   email?: string;
 };
 type C = { services: Array<{ id: string; display_name: string }>; tiers: Array<{ id: string; service_id: string; tier_label: string; country_iso2: string; retail_price_kobo: number; last_inventory_count: number | null }> };
-type Billing = { line1: string; city: string; state: string; postal_code: string; country: string };
-const blankBilling: Billing = { line1: "", city: "", state: "", postal_code: "", country: "NG" };
 const pages: Record<string, { title: string; description: string }> = {
   catalog: { title: "Browse services", description: "Choose a verified service and a live, available number." },
   orders: { title: "My orders", description: "Track your number activations and order history." },
@@ -48,7 +41,6 @@ export default function CustomerSection({ section }: { section: string }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
-  const [billing, setBilling] = useState<Billing>(blankBilling);
   const [fundAmount, setFundAmount] = useState("1000");
   const [buying, setBuying] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -62,13 +54,6 @@ export default function CustomerSection({ section }: { section: string }) {
         setD(j);
         setName(j.profile?.display_name || "");
         setPhone(j.profile?.phone_e164 || "");
-        setBilling({
-          line1: j.profile?.billing_address_line1 || "",
-          city: j.profile?.billing_city || "",
-          state: j.profile?.billing_state || "",
-          postal_code: j.profile?.billing_postal_code || "",
-          country: j.profile?.billing_country || "NG",
-        });
       } else {
         setNotice("We couldn't refresh your account details. Please try again.");
       }
@@ -122,11 +107,6 @@ export default function CustomerSection({ section }: { section: string }) {
         body: JSON.stringify({
           display_name: name,
           phone_e164: phone || null,
-          billing_address_line1: billing.line1 || null,
-          billing_city: billing.city || null,
-          billing_state: billing.state || null,
-          billing_postal_code: billing.postal_code || null,
-          billing_country: billing.country || "NG",
         }),
       });
       const j = await r.json();
@@ -271,24 +251,6 @@ export default function CustomerSection({ section }: { section: string }) {
           </section>
 
           <section className="workspace-panel">
-            <div className="workspace-section-title">
-              <div><h2>Billing details</h2><p>Optional billing details for your account. They are not required for hosted checkout.</p></div>
-              <MapPin size={20} className="workspace-purple-icon"/>
-            </div>
-            <div className="workspace-form-grid">
-              {field("Street address", billing.line1, (v) => setBilling({ ...billing, line1: v }), "House number and street")}
-              {field("City", billing.city, (v) => setBilling({ ...billing, city: v }), "Your city")}
-              {field("State", billing.state, (v) => setBilling({ ...billing, state: v }), "Your state")}
-              {field("Postal code", billing.postal_code, (v) => setBilling({ ...billing, postal_code: v }), "Postal / ZIP code")}
-              <label className="workspace-field"><span>Country</span><select className="workspace-input" value={billing.country} onChange={(e) => setBilling({ ...billing, country: e.target.value })}><option value="NG">Nigeria</option><option value="GH">Ghana</option><option value="US">United States</option><option value="GB">United Kingdom</option></select></label>
-            </div>
-            <div className="workspace-form-footer">
-              <p className="workspace-helper">Your billing details are stored securely in your account and used for payment processing.</p>
-              <button className="workspace-secondary" onClick={() => void saveProfile()} disabled={saving}><Save size={15}/>{saving ? "Saving…" : "Save billing details"}</button>
-            </div>
-          </section>
-
-          <section className="workspace-panel">
             <div className="workspace-section-title"><div><h2>Wallet transactions</h2><p>Your confirmed wallet activity.</p></div><span className="workspace-count">{d.transactions?.length || 0}</span></div>
             {loading ? <Empty text="Loading transactions…"/> : d.transactions?.length ? (
               <div className="workspace-list">{d.transactions.map((t) => (
@@ -313,17 +275,6 @@ export default function CustomerSection({ section }: { section: string }) {
               {field("Phone number", phone, setPhone, "+234…", false)}
               <div className="workspace-form-footer full-width"><button className="workspace-primary" disabled={saving}>{saving ? "Saving…" : "Save changes"}</button></div>
             </form>
-          </section>
-          <section className="workspace-panel">
-            <div className="workspace-section-title"><div><h2>Billing address</h2><p>Optional contact and billing details for your account.</p></div></div>
-            <div className="workspace-form-grid">
-              {field("Street address", billing.line1, (v) => setBilling({ ...billing, line1: v }), "House number and street")}
-              {field("City", billing.city, (v) => setBilling({ ...billing, city: v }), "Your city")}
-              {field("State", billing.state, (v) => setBilling({ ...billing, state: v }), "Your state")}
-              {field("Postal code", billing.postal_code, (v) => setBilling({ ...billing, postal_code: v }), "Postal / ZIP code")}
-              <label className="workspace-field"><span>Country</span><select className="workspace-input" value={billing.country} onChange={(e) => setBilling({ ...billing, country: e.target.value })}><option value="NG">Nigeria</option><option value="GH">Ghana</option><option value="US">United States</option><option value="GB">United Kingdom</option></select></label>
-              <div className="workspace-form-footer full-width"><button className="workspace-primary" onClick={() => void saveProfile()} disabled={saving}><Save size={15}/>{saving ? "Saving…" : "Save billing address"}</button></div>
-            </div>
           </section>
           <section className="workspace-panel">
             <div className="workspace-section-title"><div><h2>Password & security</h2><p>Choose a strong password you don&apos;t use elsewhere.</p></div><ShieldCheck className="workspace-purple-icon"/></div>
