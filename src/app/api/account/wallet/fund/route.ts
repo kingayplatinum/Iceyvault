@@ -88,6 +88,11 @@ export async function POST(request: NextRequest) {
         tx_ref: reference,
         amount: Math.round(parsed.data.amountKobo / 100),
         currency: "NGN",
+        // Nigerian NGN methods: bank transfer (temporary virtual account), card,
+        // bank account, USSD and other supported local methods.
+        // Flutterwave account-level preferred-method settings must be disabled
+        // for this per-transaction list to take effect.
+        payment_options: "card, banktransfer, account, ussd, opay, nqr, enaira, internetbanking",
         redirect_url: redirectUrl.toString(),
         customer: {
           email: user.email,
