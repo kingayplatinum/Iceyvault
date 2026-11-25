@@ -14,15 +14,25 @@ function safeEqual(a: string, b: string): boolean {
 
 export async function POST(request: NextRequest) {
   const secret = process.env.FLW_WEBHOOK_SECRET_HASH;
-  const signature = request.headers.get("verif-hash") || "";
-  if (!secret || !signature || !safeEqual(signature, secret)) {
-    return new NextResponse("Unauthorized", { status: 401 });
-  }
+  const rawBody = await request.text();
+  const staticHash = request.headers.get("verif-hash") || "";
+  const v4Signature = request.headers.get("flutterwave-signature") || "";
+  const digest = secret ? createHmac("sha256", secret).update(rawBody).digest() : null;
+  const expectedHex = digest?.toString("hex") || "";
+  const expectedBase64 = digest?.toString("base64") || "";
+  const validStatic = Boolean(secret && staticHash && safeEqual(staticHash, secret));
+  const validV4 = Boolean(secret && v4Signature && (
+    safeEqual(v4Signature, expectedHex) ||
+    safeEqual(v4Signature, "sha256=" + expectedHex) ||
+    safeEqual(v4Signature, expectedBase64)
+  ));
+  if (!secret || (!validStatic && !validV4)) return new NextResponse("Unauthorized", { status: 401 });
 
-  const payload = (() => { try { return JSON.parse(rawBody) as {
+  let payload: {
     event?: string;
     data?: { id?: string | number; reference?: string; status?: string; tx_ref?: string };
-  } | null;
+  } | null = null;
+  try { payload = JSON.parse(rawBody); } catch { return new NextResponse("Invalid JSON", { status: 400 }); }
   if (!payload?.event || !payload.data) return new NextResponse("Invalid payload", { status: 400 });
 
   if (!["order.completed", "charge.completed"].includes(payload.event)) {
