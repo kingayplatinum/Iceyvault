@@ -55,6 +55,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "This payment request is already being processed. Refresh your wallet in a moment.", reference: existing.gateway_reference }, { status: 202 });
   }
 
+  const { data: profile } = await service.from("profiles")
+    .select("display_name,phone_e164,billing_address_line1,billing_city,billing_state,billing_postal_code,billing_country").eq("id", user.id).maybeSingle();
+  const address = {
+    line1: profile?.billing_address_line1?.trim(),
+    city: profile?.billing_city?.trim(),
+    state: profile?.billing_state?.trim(),
+    postal_code: profile?.billing_postal_code?.trim(),
+    country: (profile?.billing_country || "NG").trim().toUpperCase(),
+  };
+  if (!address.line1 || !address.city || !address.state || !address.postal_code || !/^[A-Z]{2}$/.test(address.country)) {
+      return NextResponse.json({
+      error: "Add your billing address (street, city, state and postal code) in Account settings before funding your wallet. No payment was initiated.",
+      code: "BILLING_ADDRESS_REQUIRED",
+    }, { status: 400 });
+  }
+
   const reference = `IVW${randomUUID().replaceAll("-", "")}`;
   const { data: payment, error: paymentError } = await service.from("payment_transactions").insert({
     user_id: user.id,
@@ -68,26 +84,6 @@ export async function POST(request: NextRequest) {
   }).select("id").single();
   if (paymentError || !payment) return NextResponse.json({ error: "Could not create a payment request. Please retry once." }, { status: 500 });
 
-  const { data: profile } = await service.from("profiles")
-    .select("display_name,phone_e164,billing_address_line1,billing_city,billing_state,billing_postal_code,billing_country").eq("id", user.id).maybeSingle();
-  const address = {
-    line1: profile?.billing_address_line1?.trim(),
-    city: profile?.billing_city?.trim(),
-    state: profile?.billing_state?.trim(),
-    postal_code: profile?.billing_postal_code?.trim(),
-    country: (profile?.billing_country || "NG").trim().toUpperCase(),
-  };
-  if (!address.line1 || !address.city || !address.state || !address.postal_code || !/^[A-Z]{2}$/.test(address.country)) {
-    await service.from("payment_transactions").update({
-      status: "failed",
-      failure_reason: "Billing address required before Flutterwave checkout",
-      updated_at: new Date().toISOString(),
-    }).eq("id", payment.id).eq("status", "pending");
-    return NextResponse.json({
-      error: "Add your billing address (street, city, state and postal code) in Account settings before funding your wallet. No payment was initiated.",
-      code: "BILLING_ADDRESS_REQUIRED",
-    }, { status: 400 });
-  }
   const displayName = (profile?.display_name || user.email?.split("@")[0] || "IceyVault Customer").trim();
   const parts = displayName.split(/\s+/).filter(Boolean);
   const first = parts[0] && parts[0].length >= 2 ? parts[0] : "IceyVault";
