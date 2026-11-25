@@ -74,14 +74,14 @@ export async function POST(request: NextRequest) {
     return fail("This tier is not configured with a supplier-enforced price cap. Your wallet has been refunded.", 409);
   }
 
-  let supplierOrder: SupplierOrder;
+  let supplierOrder: SupplierOrder;\n  let supplierFxRate: number | null = null;\n  let supplierFxAsOf: string | null = null;
   try {
     const result = await smscodeRequest<CreateResult>("/orders/create", {
       method: "POST",
       headers: { "Idempotency-Key": orderId },
       body: JSON.stringify({ catalog_product_id: catalogProductId, max_price: cap.toFixed(4), quantity: 1 }),
     });
-    supplierOrder = result.data.orders?.[0];
+    supplierOrder = result.data.orders?.[0];\n    const fx = result.meta as { fx?: { rate?: number; rate_as_of?: string | null } } | undefined;\n    supplierFxRate = Number(fx?.fx?.rate) || null;\n    supplierFxAsOf = fx?.fx?.rate_as_of ?? null;
     if (!supplierOrder) {
       await service.rpc("refund_failed_smscode_order", { p_order_id: orderId, p_reason: "SMSCode returned no successful order" });
       return fail("The supplier could not fulfil this number. Your wallet has been refunded.", 502);
@@ -164,7 +164,42 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ orderId, status: "review_required", message: "Supplier accepted the order. Number details are safely held for administrator reconciliation." }, { status: 202 });
   }
 
-  const status = supplierOrder.status === "OTP_RECEIVED" ? "waiting_message" : "active";
+  if (supplierAmount > cap) {
+    try {
+      const canceled = await smscodeRequest<{ order_id: number; status: string }>("/orders/cancel", {
+        method: "POST", body: JSON.stringify({ id: supplierOrder.id }),
+      });
+      if (canceled.data.status === "CANCELED") {
+        await service.from("provider_orders").update({ status: "CANCELED", updated_at: new Date().toISOString() }).eq("id", providerOrder.id);
+        await service.from("numbers").update({ status: "unavailable", updated_at: new Date().toISOString() }).eq("id", numberRow.id);
+        await service.rpc("refund_failed_smscode_order", { p_order_id: orderId, p_reason: "Supplier price exceeded configured maximum" });
+        return fail("Supplier price exceeded the configured cap. The number was canceled and your wallet was refunded.", 502);
+      }
+    } catch {
+      // Keep the customer's funds reserved until the supplier cancellation can be verified.
+    }
+    await service.from("orders").update({ number_id: numberRow.id, status: "review_required", updated_at: new Date().toISOString() }).eq("id", orderId);
+    await service.from("provider_orders").update({ status: "REVIEW_REQUIRED", updated_at: new Date().toISOString() }).eq("id", providerOrder.id);
+    return NextResponse.json({ orderId, status: "review_required", message: "The supplier charged above the configured cap. The number is held for administrator reconciliation; your wallet has not been refunded yet." }, { status: 202 });
+  }
+
+  const { error: costLedgerError } = await service.from("supplier_cost_ledger").insert({
+    order_id: orderId,
+    provider_order_id: providerOrder.id,
+    supplier_code: "smscode",
+    supplier_product_id: String(supplierOrder.product_id),
+    supplier_currency: supplierOrder.amount.canonical_currency,
+    supplier_amount_minor: supplierOrder.amount.canonical_amount,
+    supplier_amount_usd: supplierAmount,
+    fx_rate_usd_to_idr: supplierFxRate,
+    customer_revenue_ngn_kobo: reservation.retail_amount_kobo,
+    metadata: { catalog_product_id: supplierOrder.catalog_product_id, fx_rate_as_of: supplierFxAsOf },
+  });
+  if (costLedgerError) {
+    await service.from("orders").update({ number_id: numberRow.id, status: "review_required", updated_at: new Date().toISOString() }).eq("id", orderId);
+    return NextResponse.json({ orderId, status: "review_required", message: "The number was purchased, but supplier cost accounting needs administrator reconciliation." }, { status: 202 });
+  }
+\n  const status = supplierOrder.status === "OTP_RECEIVED" ? "waiting_message" : "active";
   const { error: orderUpdateError } = await service.from("orders").update({
     number_id: numberRow.id, status, fulfilled_at: new Date().toISOString(), updated_at: new Date().toISOString(),
   }).eq("id", orderId);
