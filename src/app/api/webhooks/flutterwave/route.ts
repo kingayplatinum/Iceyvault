@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { verifyAndCreditWalletPayment } from "@/lib/verify-flutterwave-wallet";
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
-  const payload = await request.json().catch(() => null) as {
+  const payload = (() => { try { return JSON.parse(rawBody) as {
     event?: string;
     data?: { id?: string | number; reference?: string; status?: string; tx_ref?: string };
   } | null;
