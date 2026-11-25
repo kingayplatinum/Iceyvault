@@ -78,18 +78,23 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   try {
     if (parsed.data.action === "cancel") {
       if (!["active","waiting_message"].includes(order.status)) return NextResponse.json({ error: "This order cannot be canceled in its current state." }, { status: 409 });
-      const result = await smscodeRequest<{ order_id: number; status: string }>( "/orders/cancel", {
+      const live = await smscodeRequest<SupplierOrder>(`/orders/${supplierId}`);
+      if (!live.data.can_cancel) return NextResponse.json({ error: "The supplier does not currently allow cancellation of this number." }, { status: 409 });
+      const result = await smscodeRequest<{ order_id: number; status: string }>("/orders/cancel", {
         method: "POST", body: JSON.stringify({ id: supplierId }),
       });
       if (result.data.status !== "CANCELED") return NextResponse.json({ error: "The supplier has not confirmed cancellation. Your wallet has not been refunded." }, { status: 409 });
       const { error } = await service.rpc("refund_failed_smscode_order", { p_order_id: id, p_reason: "Customer canceled supplier number" });
       if (error) return NextResponse.json({ error: "Supplier canceled the number, but the wallet refund needs administrator reconciliation." }, { status: 202 });
       await service.from("provider_orders").update({ status: "CANCELED", updated_at: new Date().toISOString() }).eq("order_id", id);
+      await service.from("numbers").update({ status: "unavailable", updated_at: new Date().toISOString() }).eq("provider_number_ref", String(supplierId));
       return NextResponse.json({ status: "refunded", message: "Number canceled and wallet refunded." });
     }
 
     if (parsed.data.action === "finish") {
       if (order.status !== "waiting_message") return NextResponse.json({ error: "Finish is available after a verification message has arrived." }, { status: 409 });
+      const live = await smscodeRequest<SupplierOrder>(`/orders/${supplierId}`);
+      if (!live.data.can_finish) return NextResponse.json({ error: "The supplier does not currently allow this order to be finished." }, { status: 409 });
       const result = await smscodeRequest<{ order_id: number; status: string }>("/orders/finish", {
         method: "POST", body: JSON.stringify({ id: supplierId }),
       });
