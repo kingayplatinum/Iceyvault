@@ -212,3 +212,90 @@ revoke all on function private.refund_failed_smscode_order(uuid,text) from publi
 grant execute on function private.credit_wallet_from_verified_payment(uuid,text,bigint,text,jsonb) to service_role;
 grant execute on function private.reserve_smscode_order(uuid,uuid,text) to service_role;
 grant execute on function private.refund_failed_smscode_order(uuid,text) to service_role;
+
+
+-- Bind an idempotent order to the exact tier requested.
+alter table public.orders
+  add column if not exists smscode_tier_id uuid references public.smscode_product_tiers(id) on delete restrict;
+
+create or replace function private.reserve_smscode_order(
+  p_user_id uuid,
+  p_tier_id uuid,
+  p_idempotency_key text
+) returns table(order_id uuid, retail_amount_kobo bigint, supplier_cap_usd numeric, supplier_product_id text, catalog_product_id text, service_code text, wallet_balance_kobo bigint)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_tier public.smscode_product_tiers%rowtype;
+  v_service public.smscode_service_catalogue%rowtype;
+  v_wallet public.wallets%rowtype;
+  v_existing public.orders%rowtype;
+begin
+  if p_idempotency_key is null or length(p_idempotency_key) < 16 or length(p_idempotency_key) > 128 then
+    raise exception 'INVALID_IDEMPOTENCY_KEY';
+  end if;
+
+  select * into v_existing
+  from public.orders o
+  where o.user_id = p_user_id and o.idempotency_key = p_idempotency_key
+  for update;
+  if found then
+    if v_existing.smscode_tier_id is distinct from p_tier_id then
+      raise exception 'IDEMPOTENCY_KEY_REUSED';
+    end if;
+    select t.max_supplier_price_usd, t.smscode_product_id, t.smscode_catalog_product_id,
+           s.sms_code_service_code, w.balance_kobo
+      into supplier_cap_usd, supplier_product_id, catalog_product_id, service_code, wallet_balance_kobo
+    from public.smscode_product_tiers t
+    join public.smscode_service_catalogue s on s.id = t.service_id
+    join public.wallets w on w.user_id = p_user_id
+    where t.id = p_tier_id;
+    order_id := v_existing.id;
+    retail_amount_kobo := v_existing.retail_amount_kobo;
+    return next;
+    return;
+  end if;
+
+  select * into v_tier from public.smscode_product_tiers where id = p_tier_id for update;
+  if not found or not v_tier.active then raise exception 'TIER_NOT_AVAILABLE'; end if;
+  select * into v_service from public.smscode_service_catalogue where id = v_tier.service_id;
+  if not found or not v_service.active or not v_service.supported then raise exception 'SERVICE_NOT_AVAILABLE'; end if;
+  if v_tier.smscode_product_id is null then raise exception 'SUPPLIER_PRODUCT_NOT_MAPPED'; end if;
+  if v_tier.last_verified_at is null or v_tier.last_verified_at < now() - interval '10 minutes' then raise exception 'SUPPLIER_PRODUCT_STALE'; end if;
+  if coalesce(v_tier.last_inventory_count,0) < 1 then raise exception 'OUT_OF_STOCK'; end if;
+  if v_tier.last_supplier_price_usd is null or v_tier.last_supplier_price_usd > v_tier.max_supplier_price_usd then raise exception 'SUPPLIER_PRICE_CAP_EXCEEDED'; end if;
+  if v_tier.retail_price_kobo <= 0 then raise exception 'INVALID_RETAIL_PRICE'; end if;
+
+  select * into v_wallet from public.wallets where user_id = p_user_id for update;
+  if not found then raise exception 'WALLET_NOT_FOUND'; end if;
+  if v_wallet.balance_kobo < v_tier.retail_price_kobo then raise exception 'INSUFFICIENT_WALLET_BALANCE'; end if;
+
+  insert into public.orders(user_id,offer_kind,status,retail_amount_kobo,currency,idempotency_key,smscode_tier_id)
+  values (p_user_id,'sms_activation','provisioning',v_tier.retail_price_kobo,'NGN',p_idempotency_key,v_tier.id)
+  returning id into order_id;
+
+  update public.wallets set balance_kobo = balance_kobo - v_tier.retail_price_kobo
+  where id = v_wallet.id returning balance_kobo into wallet_balance_kobo;
+
+  insert into public.wallet_transactions(
+    wallet_id,user_id,direction,amount_kobo,balance_after_kobo,reference,
+    transaction_type,description,metadata
+  ) values (
+    v_wallet.id,p_user_id,'debit',v_tier.retail_price_kobo,wallet_balance_kobo,
+    'smscode-order:' || order_id,'purchase','SMSCode number purchase',
+    jsonb_build_object('order_id',order_id,'tier_id',v_tier.id)
+  );
+
+  retail_amount_kobo := v_tier.retail_price_kobo;
+  supplier_cap_usd := v_tier.max_supplier_price_usd;
+  supplier_product_id := v_tier.smscode_product_id;
+  catalog_product_id := v_tier.smscode_catalog_product_id;
+  service_code := v_service.sms_code_service_code;
+  return next;
+end;
+$$;
+
+revoke all on function private.reserve_smscode_order(uuid,uuid,text) from public, anon, authenticated;
+grant execute on function private.reserve_smscode_order(uuid,uuid,text) to service_role;
