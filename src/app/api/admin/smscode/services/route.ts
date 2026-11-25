@@ -60,9 +60,14 @@ export async function POST(request: NextRequest) {
     }
 
     const now = new Date().toISOString();
-    const serviceRows = [...new Map(services.map((service) => {
+    const serviceMap = new Map<string, {
+      service_key: string; display_name: string; sms_code_service_code: string;
+      supported: boolean; last_verified_at: string; verification_note: string; updated_at: string;
+    }>();
+    for (const service of services) {
       const serviceKey = keyFor(service.name);
-      return [serviceKey, {
+      if (!serviceKey) continue;
+      serviceMap.set(serviceKey, {
         service_key: serviceKey,
         display_name: service.name,
         sms_code_service_code: service.code,
@@ -70,8 +75,9 @@ export async function POST(request: NextRequest) {
         last_verified_at: now,
         verification_note: `Confirmed active in the live SMSCode catalogue for ${country.name}.`,
         updated_at: now,
-      }];
-    }).filter(([key]) => Boolean(key))).values()];
+      });
+    }
+    const serviceRows = [...serviceMap.values()];
 
     stage = "save_services";
     const { error: serviceError } = await auth.service
