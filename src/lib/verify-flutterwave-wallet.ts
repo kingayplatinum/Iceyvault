@@ -44,5 +44,5 @@ export async function verifyAndCreditWalletPayment(paymentId: string) {
     p_verified_payload: { provider_order_id: order.id, status: order.status, amount: order.amount, currency: order.currency, reference: order.reference },
   });
   if (creditError) throw new Error(creditError.message || "WALLET_CREDIT_FAILED");
-  return { credited: Boolean(credited), status: "successful" };
+  return { credited: settlement?.status === "settled", status: "successful" };
 }
