@@ -299,3 +299,47 @@ $$;
 
 revoke all on function private.reserve_smscode_order(uuid,uuid,text) from public, anon, authenticated;
 grant execute on function private.reserve_smscode_order(uuid,uuid,text) to service_role;
+
+
+-- Supplier cancellation/expiry may happen after a number has already been assigned.
+create or replace function private.refund_failed_smscode_order(
+  p_order_id uuid,
+  p_reason text
+) returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_order public.orders%rowtype;
+  v_wallet_id uuid;
+  v_balance bigint;
+begin
+  select * into v_order from public.orders where id = p_order_id for update;
+  if not found then raise exception 'ORDER_NOT_FOUND'; end if;
+  if v_order.status = 'refunded' then return false; end if;
+  if v_order.status not in ('provisioning','paid','active','waiting_message','failed') then
+    raise exception 'ORDER_NOT_REFUNDABLE';
+  end if;
+
+  select id into v_wallet_id from public.wallets where user_id = v_order.user_id for update;
+  if not found then raise exception 'WALLET_NOT_FOUND'; end if;
+
+  update public.wallets set balance_kobo = balance_kobo + v_order.retail_amount_kobo
+  where id = v_wallet_id returning balance_kobo into v_balance;
+
+  insert into public.wallet_transactions(
+    wallet_id,user_id,direction,amount_kobo,balance_after_kobo,reference,
+    transaction_type,description,metadata
+  ) values (
+    v_wallet_id,v_order.user_id,'credit',v_order.retail_amount_kobo,v_balance,
+    'smscode-refund:' || v_order.id,'refund','Refund for unsuccessful SMSCode fulfilment',
+    jsonb_build_object('order_id',v_order.id,'reason',left(coalesce(p_reason,'Supplier fulfilment failed'),500))
+  );
+
+  update public.orders set status = 'refunded', updated_at = now() where id = v_order.id;
+  return true;
+end;
+$$;
+revoke all on function private.refund_failed_smscode_order(uuid,text) from public, anon, authenticated;
+grant execute on function private.refund_failed_smscode_order(uuid,text) to service_role;
