@@ -21,11 +21,11 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
   const parsed = patchSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success || Object.keys(parsed.data ?? {}).length === 0) return NextResponse.json({ error: "Invalid tier update." }, { status: 400 });
   if (parsed.data.active === true) {
-    const { data: current } = await auth.service.from("smscode_product_tiers").select("service_id,smscode_product_id").eq("id", id).maybeSingle();
+    const { data: current } = await auth.service.from("smscode_product_tiers").select("service_id,smscode_product_id,smscode_catalog_product_id,retail_price_kobo,max_supplier_price_usd,last_supplier_price_usd,last_inventory_count,last_verified_at").eq("id", id).maybeSingle();
     if (!current) return NextResponse.json({ error: "Tier not found." }, { status: 404 });
     const { data: service } = await auth.service.from("smscode_service_catalogue").select("supported,active").eq("id", current.service_id).maybeSingle();
-    const productId = parsed.data.smscode_product_id ?? current.smscode_product_id;
-    if (!service?.supported || !service.active || !productId) return NextResponse.json({ error: "Verify and enable the service and attach a confirmed SMSCode product before activating this tier." }, { status: 409 });
+    const productId = parsed.data.smscode_product_id ?? current.smscode_product_id;const catalogProductId = parsed.data.smscode_catalog_product_id ?? current.smscode_catalog_product_id;const retailPrice = parsed.data.retail_price_kobo ?? current.retail_price_kobo;const supplierCap = parsed.data.max_supplier_price_usd ?? current.max_supplier_price_usd;
+    if (!service?.supported || !service.active || !productId || !catalogProductId || retailPrice <= 0 || supplierCap < (current.last_supplier_price_usd ?? 0) || (current.last_inventory_count ?? 0) <= 0 || !current.last_verified_at || new Date(current.last_verified_at).getTime() < Date.now() - 10 * 60 * 1000) return NextResponse.json({ error: "A tier needs an active service, a verified supplier catalogue product, fresh stock and a positive NGN retail price before activation." }, { status: 409 });
   }
   const { data, error } = await auth.service.from("smscode_product_tiers").update({ ...parsed.data, updated_at: new Date().toISOString() }).eq("id", id).select().maybeSingle();
   if (error) return NextResponse.json({ error: "Could not update tier." }, { status: 500 });
