@@ -143,6 +143,14 @@ export async function POST(request: NextRequest) {
     return fail("This tier is not configured with a supplier-enforced price cap. Your wallet has been refunded.", 409);
   }
 
+  const { data: tierMapping, error: tierMappingError } = await service
+    .from("smscode_product_tiers").select("smscode_operator_id").eq("id", parsed.data.tierId).maybeSingle();
+  if (tierMappingError || !tierMapping) {
+    await service.rpc("refund_failed_smscode_order", { p_order_id: orderId, p_reason: "Could not load selected supplier operator mapping" });
+    return fail("Could not verify the selected supplier tier. Your wallet has been refunded.", 500);
+  }
+  const supplierOperatorId = tierMapping.smscode_operator_id;
+
   let supplierOrder: SupplierOrder;
   let supplierFxRate: number | null = null;
   let supplierFxAsOf: string | null = null;
@@ -150,7 +158,7 @@ export async function POST(request: NextRequest) {
     const result = await smscodeRequest<CreateResult>("/orders/create", {
       method: "POST",
       headers: { "Idempotency-Key": orderId },
-      body: JSON.stringify({ catalog_product_id: catalogProductId, max_price: cap.toFixed(4), quantity: 1 }),
+      body: JSON.stringify({ catalog_product_id: catalogProductId, ...(supplierOperatorId ? { operator_id: supplierOperatorId } : {}), max_price: cap.toFixed(4), quantity: 1 }),
     });
     supplierOrder = result.data.orders?.[0];
     const fx = result.meta as { fx?: { rate?: number; rate_as_of?: string | null } } | undefined;
