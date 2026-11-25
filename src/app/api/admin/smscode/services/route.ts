@@ -19,14 +19,11 @@ export async function POST() {
   const auth = await requireAdmin();
   if ("response" in auth) return auth.response;
   try {
-    const [{ data: countries }, { data: allServices }] = await Promise.all([
-      smscodeRequest<Country[]>("/catalog/countries"),
-      smscodeRequest<RemoteService[]>("/catalog/services"),
-    ]);
-    const nigeria = countries.find((country) => country.code.toUpperCase() === "NG");
-    if (!nigeria) return NextResponse.json({ error: "SMSCode does not currently list Nigeria in its country catalogue. No products were changed." }, { status: 409 });
-
-    const services = allServices.filter((service) => service.active);
+    const { data: countries } = await smscodeRequest<Country[]>("/catalog/countries");
+    const nigeria = countries.find((country) => country.code.toUpperCase() === "NG" && country.active);
+    if (!nigeria) return NextResponse.json({ error: "SMSCode does not currently list Nigeria as an active country. No products were changed." }, { status: 409 });
+    const { data: countryServices } = await smscodeRequest<RemoteService[]>(`/catalog/services?country_id=${nigeria.id}`);
+    const services = countryServices.filter((service) => service.active);
     const serviceRows = services.map((service) => ({
       service_key: keyFor(service.name),
       display_name: service.name,
