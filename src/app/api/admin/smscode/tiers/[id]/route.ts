@@ -25,7 +25,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     if (!current) return NextResponse.json({ error: "Tier not found." }, { status: 404 });
     const { data: service } = await auth.service.from("smscode_service_catalogue").select("supported,active").eq("id", current.service_id).maybeSingle();
     const productId = parsed.data.smscode_product_id ?? current.smscode_product_id;const catalogProductId = parsed.data.smscode_catalog_product_id ?? current.smscode_catalog_product_id;const retailPrice = parsed.data.retail_price_kobo ?? current.retail_price_kobo;
-    if (!service?.supported || !service.active || !productId) return NextResponse.json({ error: "Verify and enable the service and attach a confirmed SMSCode product before activating this tier." }, { status: 409 });
+    if (!service?.supported || !service.active || !productId || !catalogProductId || retailPrice <= 0 || (current.last_inventory_count ?? 0) <= 0 || !current.last_verified_at || new Date(current.last_verified_at).getTime() < Date.now() - 10 * 60 * 1000) return NextResponse.json({ error: "A tier needs an active service, a verified supplier catalogue product, fresh stock and a positive NGN retail price before activation." }, { status: 409 });
   }
   const { data, error } = await auth.service.from("smscode_product_tiers").update({ ...parsed.data, updated_at: new Date().toISOString() }).eq("id", id).select().maybeSingle();
   if (error) return NextResponse.json({ error: "Could not update tier." }, { status: 500 });
