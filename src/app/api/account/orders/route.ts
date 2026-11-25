@@ -44,11 +44,12 @@ export async function POST(request: NextRequest) {
   });
   if (reserveError) {
     const reason = reserveError.message || "";
-    const status = reason.includes("INSUFFICIENT_WALLET_BALANCE") ? 402 :
-      reason.includes("NOT_AVAILABLE") || reason.includes("OUT_OF_STOCK") || reason.includes("STALE") || reason.includes("CAP_EXCEEDED") ? 409 :
+    const insufficient = reason.toLowerCase().includes("insufficient wallet balance") || reason.includes("INSUFFICIENT_WALLET_BALANCE");
+    const status = insufficient ? 402 :
+      reason.includes("NOT_AVAILABLE") || reason.includes("OUT_OF_STOCK") || reason.includes("STALE") || reason.includes("CAP_EXCEEDED") || reason.includes("ORDER_ALREADY_TERMINAL") ? 409 :
       reason.includes("IDEMPOTENCY_KEY_REUSED") ? 409 : 400;
     return fail(
-      reason.includes("INSUFFICIENT_WALLET_BALANCE") ? "Your wallet balance is insufficient. Add funds and try again." :
+      insufficient ? "Your wallet balance is insufficient. Add funds and try again." :
       reason.includes("SUPPLIER_PRODUCT_STALE") ? "This price or stock quote has expired. Refresh the catalogue and try again." :
       reason.includes("SUPPLIER_PRICE_CAP_EXCEEDED") ? "The supplier price is above the configured cap. This tier is temporarily unavailable." :
       reason.includes("OUT_OF_STOCK") ? "This tier is currently out of stock." :
@@ -61,10 +62,19 @@ export async function POST(request: NextRequest) {
   if (!reservation?.order_id) return fail("Could not reserve this purchase. No supplier order was placed.", 500);
   const orderId = reservation.order_id as string;
 
-  const { data: existingProviderOrder } = await service
-    .from("provider_orders").select("provider_order_ref,status").eq("order_id", orderId).maybeSingle();
+  const [{ data: existingProviderOrder, error: existingProviderError }, { data: existingLocalOrder, error: existingLocalError }] = await Promise.all([
+    service.from("provider_orders").select("provider_order_ref,status").eq("order_id", orderId).maybeSingle(),
+    service.from("orders").select("number_id,status").eq("id", orderId).maybeSingle(),
+  ]);
+  if (existingProviderError || existingLocalError || !existingLocalOrder) {
+    return fail("Could not safely verify the current order state. No new supplier request was sent.", 503);
+  }
   if (existingProviderOrder) {
-    return NextResponse.json({ orderId, status: existingProviderOrder.status, alreadyProcessed: true });
+    if (existingLocalOrder.number_id) {
+      return NextResponse.json({ orderId, status: existingLocalOrder.status, alreadyProcessed: true });
+    }
+    await service.from("orders").update({ status: "review_required", updated_at: new Date().toISOString() }).eq("id", orderId);
+    return NextResponse.json({ orderId, status: "review_required", message: "The supplier order already exists, but its number record needs administrator reconciliation. No duplicate supplier order was created." }, { status: 202 });
   }
 
   const catalogProductId = Number(reservation.catalog_product_id);
@@ -202,7 +212,7 @@ export async function POST(request: NextRequest) {
   }
 \n  const status = supplierOrder.status === "OTP_RECEIVED" ? "waiting_message" : "active";
   const { error: orderUpdateError } = await service.from("orders").update({
-    number_id: numberRow.id, status, fulfilled_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    number_id: numberRow.id, status, expires_at: supplierOrder.expires_at ?? null, fulfilled_at: new Date().toISOString(), updated_at: new Date().toISOString(),
   }).eq("id", orderId);
   if (orderUpdateError) {
     await service.from("orders").update({ status: "review_required", updated_at: new Date().toISOString() }).eq("id", orderId);
