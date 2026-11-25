@@ -9,70 +9,61 @@ export async function GET() {
   const auth = await requireAdmin();
   if ("response" in auth) return auth.response;
 
-  const clientId = process.env.FLW_CLIENT_ID;
-  const clientSecret = process.env.FLW_CLIENT_SECRET;
+  const secretKey = process.env.FLW_SECRET_KEY;
   const webhookSecret = process.env.FLW_WEBHOOK_SECRET_HASH;
-  const apiBase = process.env.FLW_API_BASE_URL;
   const missing = [
-    !clientId && "FLW_CLIENT_ID",
-    !clientSecret && "FLW_CLIENT_SECRET",
+    !secretKey && "FLW_SECRET_KEY",
     !webhookSecret && "FLW_WEBHOOK_SECRET_HASH",
-    !apiBase && "FLW_API_BASE_URL",
   ].filter(Boolean);
+  const mode = secretKey?.startsWith("FLWSECK_TEST-") ? "test" : "live";
 
   if (missing.length) {
     return NextResponse.json({
       configured: false,
       connected: false,
-      mode: "live",
+      mode,
       missing,
-      message: "Flutterwave V4 Live credentials or API endpoint are incomplete in this environment.",
+      message: "Flutterwave Standard V3 credentials are incomplete in this environment.",
     }, { status: 503 });
   }
 
   try {
-    const response = await fetch(
-      "https://idp.flutterwave.com/realms/flutterwave/protocol/openid-connect/token",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          client_id: clientId!,
-          client_secret: clientSecret!,
-          grant_type: "client_credentials",
-        }),
-        cache: "no-store",
-        signal: AbortSignal.timeout(12000),
-      }
-    );
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok || !result.access_token) {
+    // Read-only account endpoint: validates the V3 secret without initiating a charge.
+    const response = await fetch("https://api.flutterwave.com/v3/balances", {
+      method: "GET",
+      headers: { Authorization: `Bearer ${secretKey}`, Accept: "application/json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(12_000),
+    });
+    const result = await response.json().catch(() => ({})) as { status?: string; message?: string; data?: Array<{ currency?: string }> };
+
+    if (!response.ok || result.status !== "success") {
       return NextResponse.json({
         configured: true,
         connected: false,
-        mode: "live",
-        message: "Flutterwave did not issue an access token. Check that the Live Client ID and Client Secret belong to the same active V4 credential set.",
+        mode,
+        message: response.status === 401
+          ? "Flutterwave rejected the V3 secret key. Check that the key is active and belongs to the selected Test or Live mode."
+          : result.message || "Flutterwave V3 could not validate the account credentials.",
         providerStatus: response.status,
-        providerError: result.error_description || result.error || undefined,
       }, { status: 502 });
     }
 
     return NextResponse.json({
       configured: true,
       connected: true,
-      mode: "live",
-      tokenType: result.token_type || "Bearer",
-      expiresIn: result.expires_in || null,
+      mode,
       webhookSecretConfigured: true,
+      supportedCurrencies: (result.data || []).map((item) => item.currency).filter(Boolean),
       checkedAt: new Date().toISOString(),
-      message: "Flutterwave Live OAuth authentication succeeded. No payment has been initiated.",
+      message: `Flutterwave Standard V3 ${mode} credentials authenticated successfully. No payment was initiated.`,
     }, { headers: { "Cache-Control": "no-store, max-age=0" } });
   } catch {
     return NextResponse.json({
       configured: true,
       connected: false,
-      mode: "live",
-      message: "Could not reach Flutterwave authentication. Check network availability and retry.",
+      mode,
+      message: "Could not reach Flutterwave V3. Check network availability and retry.",
     }, { status: 502 });
   }
 }
