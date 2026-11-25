@@ -14,7 +14,7 @@ export async function GET() {
   if (error) return NextResponse.json({ error: "Could not load service catalogue." }, { status: 500 });
   const { data: tiers, error: tierError } = await auth.service
     .from("smscode_product_tiers")
-    .select("id,service_id,tier_key,tier_label,country_iso2,smscode_product_id,smscode_catalog_product_id,smscode_operator_id,max_supplier_price_usd,retail_price_kobo,active,last_supplier_price_usd,last_inventory_count,last_verified_at")
+    .select("id,service_id,tier_key,tier_label,country_iso2,country_name,smscode_product_id,smscode_catalog_product_id,smscode_operator_id,max_supplier_price_usd,retail_price_kobo,active,last_supplier_price_usd,last_inventory_count,last_verified_at")
     .order("service_id").order("tier_key");
   if (tierError) return NextResponse.json({ error: "Could not load product tiers." }, { status: 500 });
   return NextResponse.json({ services: data ?? [], tiers: tiers ?? [] });
