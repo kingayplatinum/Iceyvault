@@ -31,13 +31,13 @@ export async function smscodeRequest<T>(path: string, init: RequestInit = {}): P
 }
 
 export async function getSmscodeHealth() {
-  const [balance, products] = await Promise.all([
+  const [balance, services] = await Promise.all([
     smscodeRequest<{ balance: { amount: string; currency: string; canonical_amount: number; canonical_currency: string } }>("/balance"),
-    smscodeRequest<unknown[]>("/catalog/products?limit=1&page=1"),
+    smscodeRequest<unknown[]>("/catalog/services"),
   ]);
   return {
     balance: balance.data.balance,
-    sampleProductCount: products.data.length,
+    sampleServiceCount: services.data.length,
     fx: balance.meta ?? null,
   };
 }
