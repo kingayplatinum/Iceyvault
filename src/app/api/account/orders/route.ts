@@ -128,14 +128,15 @@ export async function POST(request: NextRequest) {
     wholesale_currency: supplierOrder.amount.canonical_currency,
     supplier_cost_usd: supplierAmount,
     supplier_cost_idr: supplierOrder.amount.canonical_amount,
+    supplier_fx_rate: supplierFxRate,
     last_provider_response: {
       status: supplierOrder.status,
       product_id: supplierOrder.product_id,
       catalog_product_id: supplierOrder.catalog_product_id,
       expires_at: supplierOrder.expires_at ?? null,
     },
-  });
-  if (providerOrderError) {
+  }).select("id").single();
+  if (providerOrderError || !providerOrder) {
     await service.from("orders").update({ status: "review_required", updated_at: new Date().toISOString() }).eq("id", orderId);
     return NextResponse.json({ orderId, status: "review_required", message: "Supplier accepted the order, but the local fulfilment record needs administrator reconciliation." }, { status: 202 });
   }
