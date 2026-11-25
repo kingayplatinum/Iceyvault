@@ -1,4 +1,4 @@
-type FlutterwaveEnvelope<T> = { status?: string; message?: string; data?: T; error?: { message?: string; code?: string } };
+type FlutterwaveEnvelope<T> = { status?: string; message?: string; data?: T; error?: { message?: string; code?: string; validation_errors?: Array<{ field_name?: string; message?: string }> } };
 
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
