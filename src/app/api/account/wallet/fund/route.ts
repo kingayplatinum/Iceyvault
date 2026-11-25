@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Enter a valid amount between ₦50 and ₦500,000." }, { status: 400 });
 
-  if (!process.env.FLW_CLIENT_ID || !process.env.FLW_CLIENT_SECRET || !process.env.FLW_WEBHOOK_SECRET_HASH || !process.env.FLW_API_BASE_URL) {
+  if (!user.email) return NextResponse.json({ error: "A verified email address is required for Flutterwave checkout. Add an email to your account first." }, { status: 400 });\n  if (!process.env.FLW_CLIENT_ID || !process.env.FLW_CLIENT_SECRET || !process.env.FLW_WEBHOOK_SECRET_HASH || !process.env.FLW_API_BASE_URL) {
     return NextResponse.json({ error: "Flutterwave V4 is not fully configured for this environment. No payment was initiated." }, { status: 503 });
   }
 
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     .select("display_name,phone_e164").eq("id", user.id).maybeSingle();
   const displayName = (profile?.display_name || user.email?.split("@")[0] || "IceyVault Customer").trim();
   const parts = displayName.split(/\s+/).filter(Boolean);
-  const first = parts[0] || "IceyVault";
+  const first = parts[0] && parts[0].length >= 2 ? parts[0] : "IceyVault";
   const last = parts.slice(1).join(" ") || "Customer";
   const phoneDigits = (profile?.phone_e164 || "").replace(/^\+234/, "").replace(/^0/, "");
   const redirectUrl = new URL("/dashboard/wallet", request.nextUrl.origin);
