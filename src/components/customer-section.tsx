@@ -1,12 +1,372 @@
-"use client";import Link from "next/link";import {useEffect,useState} from "react";import {ArrowRight,ShieldCheck,RefreshCw,Wallet} from "lucide-react";
-type D={profile?:{display_name:string|null;phone_e164:string|null};wallet?:{balance_kobo:number;currency:string}|null;orders?:Array<{id:string;status:string;retail_amount_kobo:number;created_at:string;offer_kind:string}>;messages?:Array<{id:string;sender:string|null;received_at:string;status:string}>;notifications?:Array<{id:string;title:string;body:string;created_at:string}>;transactions?:Array<{id:string;direction:string;amount_kobo:number;description:string|null;created_at:string}>;email?:string};type C={services:Array<{id:string;display_name:string}>;tiers:Array<{id:string;service_id:string;tier_label:string;country_iso2:string;retail_price_kobo:number;last_inventory_count:number|null}>};
-const pages:Record<string,{title:string;description:string}>={catalog:{title:"Browse services",description:"Choose from verified virtual number services and available product tiers."},orders:{title:"My orders",description:"Track your number activations and order history."},wallet:{title:"Wallet & transactions",description:"View your NGN balance, fund your wallet and track transactions."},messages:{title:"SMS inbox",description:"View verification messages associated with your active orders."},notifications:{title:"Notifications",description:"Important updates about your account and orders."},support:{title:"Support centre",description:"Get help with account access, orders and wallet questions."},settings:{title:"Account settings",description:"Manage your personal information and account security."}};const money=(v:number)=>"₦"+(v/100).toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2});const date=(v:string)=>new Date(v).toLocaleString("en-NG",{dateStyle:"medium",timeStyle:"short"});
-export default function CustomerSection({section}:{section:string}){const item=pages[section]||pages.catalog;const [d,setD]=useState<D>({}),[c,setC]=useState<C>({services:[],tiers:[]}),[loading,setLoading]=useState(true),[notice,setNotice]=useState(""),[name,setName]=useState(""),[phone,setPhone]=useState(""),[password,setPassword]=useState(""),[fundAmount,setFundAmount]=useState("1000"),[buying,setBuying]=useState(false),[lastOrderId,setLastOrderId]=useState<string|null>(null);async function load(){try{const r=await fetch("/api/account/overview",{cache:"no-store"});if(r.ok){const j=await r.json();setD(j);setName(j.profile?.display_name||"");setPhone(j.profile?.phone_e164||"")}if(section==="catalog"){const q=await fetch("/api/account/catalogue",{cache:"no-store"});if(q.ok)setC(await q.json())}}catch{setNotice("Account data is temporarily unavailable.")}finally{setLoading(false)}}useEffect(()=>{void load()},[section]);useEffect(()=>{const params=new URLSearchParams(window.location.search);const reference=params.get("reference");if(section==="wallet"&&params.get("payment")==="pending"&&reference){fetch("/api/account/wallet/verify?reference="+encodeURIComponent(reference),{cache:"no-store"}).then(async r=>{const j=await r.json();setNotice(j.status==="successful"?(j.credited?"Payment confirmed. Your wallet has been credited.":"Payment was already credited."):"Payment is still awaiting Flutterwave confirmation. Your wallet has not been credited.");if(j.status==="successful"||j.status==="failed"){const amount=localStorage.getItem("iceyvault:fund-ref:"+reference);if(amount)localStorage.removeItem("iceyvault:fund:"+amount);localStorage.removeItem("iceyvault:fund-ref:"+reference)}await load()}).catch(()=>setNotice("Could not verify payment yet. Refresh your wallet shortly."))}},[section]);async function buyNumber(tierId:string){setBuying(true);setNotice("Reserving your number and contacting SMSCode…");const storageKey="iceyvault:order:"+tierId;let idempotencyKey="";try{idempotencyKey=localStorage.getItem(storageKey)||crypto.randomUUID();localStorage.setItem(storageKey,idempotencyKey);const r=await fetch("/api/account/orders",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({tierId,idempotencyKey})});const j=await r.json();if(j.orderId)setLastOrderId(j.orderId);if(r.status===201||r.status===200){localStorage.removeItem(storageKey);setNotice("Number purchased successfully.");await load()}else{if(r.status!==202&&r.status!==402)localStorage.removeItem(storageKey);setNotice(j.message||j.error||"Could not complete this purchase.")}}catch{setNotice("The request may still be processing. Retry this same tier to safely reuse the same request key, or check your orders before starting another purchase.")}finally{setBuying(false)}}async function fundWallet(){const amountKobo=Math.round(Number(fundAmount)*100);if(!Number.isFinite(amountKobo)||amountKobo<5000||amountKobo>50000000){setNotice("Enter an amount between ₦50 and ₦500,000.");return}setNotice("Creating secure Flutterwave checkout…");const storageKey="iceyvault:fund:"+amountKobo;try{const idempotencyKey=localStorage.getItem(storageKey)||crypto.randomUUID();localStorage.setItem(storageKey,idempotencyKey);const r=await fetch("/api/account/wallet/fund",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({amountKobo,idempotencyKey})});const j=await r.json();if(j.reference)localStorage.setItem("iceyvault:fund-ref:"+j.reference,String(amountKobo));if(!r.ok&&r.status!==202){if(r.status===409)localStorage.removeItem(storageKey);setNotice(j.error||"Could not start checkout.");return}if(j.checkoutUrl){window.location.assign(j.checkoutUrl);return}setNotice(j.error||"Your payment request is being reconciled. Do not create another payment yet.")}catch{setNotice("Could not reach the payment service. Retry using the same amount so the same request key is reused.")}}async function profile(e:React.FormEvent){e.preventDefault();const r=await fetch("/api/account/overview",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({display_name:name,phone_e164:phone||null})});const j=await r.json();setNotice(r.ok?"Profile updated.":j.error||"Could not update profile.");if(r.ok)void load()}async function changePassword(e:React.FormEvent){e.preventDefault();const r=await fetch("/api/account/password",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password})});const j=await r.json();setNotice(r.ok?"Password updated.":j.error||"Could not update password.");if(r.ok)setPassword("")}const card:React.CSSProperties={background:"white",border:"1px solid #e5e7ef",borderRadius:15,padding:20,marginTop:15};const field:React.CSSProperties={display:"grid",gap:6,fontSize:12,fontWeight:700};const input:React.CSSProperties={padding:12,border:"1px solid #dfe2eb",borderRadius:9,width:"100%",fontSize:14};return <><section className="workspace-card"><small style={{color:"#6d5bd0",fontWeight:800,letterSpacing:1.4}}>YOUR ACCOUNT</small><h1>{item.title}</h1><p className="workspace-muted">{item.description}</p></section>
-{section==="settings"?<><section style={card}><h2>Personal information</h2><form onSubmit={profile} style={{display:"grid",gap:12,maxWidth:520}}><label style={field}>Display name<input style={input} value={name} onChange={e=>setName(e.target.value)} required minLength={2}/></label><label style={field}>Email<input style={input} value={d.email||""} disabled/></label><label style={field}>Phone<input style={input} value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+234..."/></label><button className="workspace-action">Save profile</button></form></section><section style={card}><h2>Password & security</h2><form onSubmit={changePassword} style={{display:"grid",gap:12,maxWidth:520}}><label style={field}>New password<input style={input} type="password" value={password} onChange={e=>setPassword(e.target.value)} minLength={10} required/></label><button className="workspace-action">Update password</button></form></section></>:null}
-{section==="wallet"?<><section style={card}><div style={{display:"flex",justifyContent:"space-between"}}><span className="workspace-muted">Available balance</span><Wallet color="#6d5bd0"/></div><h2 style={{fontSize:34}}>{d.wallet?money(d.wallet.balance_kobo):"—"}</h2><p className="workspace-muted">NGN wallet · Balance is read from your live account.</p><div style={{display:"grid",gap:10,maxWidth:360}}><label style={field}>Amount to add (NGN)<input style={input} type="number" min="50" max="500000" step="50" value={fundAmount} onChange={e=>setFundAmount(e.target.value)}/></label><button className="workspace-action" onClick={()=>void fundWallet()}>Continue to secure payment</button></div><p className="workspace-muted" style={{fontSize:12}}>Minimum ₦50 · Maximum ₦500,000. Your wallet is credited only after Flutterwave V4 confirms the exact amount and reference server-side.</p></section><section style={card}><h2>Transactions</h2>{loading?"Loading…":d.transactions?.length?d.transactions.map(t=><div key={t.id} style={line}><b>{t.description||t.direction}</b><span>{money(t.amount_kobo)}</span><small>{date(t.created_at)}</small></div>):<Empty text="No wallet transactions recorded yet."/ >}</section></>:null}
-{section==="catalog"?<section style={card}><div style={{display:"flex",justifyContent:"space-between"}}><h2>Verified available products</h2><button onClick={()=>void load()} aria-label="Refresh catalogue"><RefreshCw size={16}/></button></div>{loading?<Empty text="Checking verified catalogue…"/>:c.tiers.length?c.tiers.map(t=><article key={t.id} style={{borderTop:"1px solid #eceef3",padding:"15px 0",display:"flex",justifyContent:"space-between",gap:12}}><div><b>{c.services.find(s=>s.id===t.service_id)?.display_name||"Service"} · {t.tier_label}</b><p className="workspace-muted" style={{fontSize:12}}>{t.country_iso2} · {t.last_inventory_count} available</p></div><div style={{display:"grid",justifyItems:"end",gap:8}}><b>{money(t.retail_price_kobo)}</b><button className="workspace-action" disabled={buying} onClick={()=>void buyNumber(t.id)}>{buying?"Processing…":"Buy number"}</button></div></article>):<Empty text="No verified products with available stock are published yet. Once SMSCode products are synced, priced and activated in the admin workspace, they will appear here automatically."/ >}{lastOrderId?<p style={{marginTop:12}}><Link href={"/dashboard/orders/"+lastOrderId}>View purchased number and OTP inbox →</Link></p>:null}</section>:null}
-{section==="orders"?<section style={card}><h2>Order history</h2>{loading?"Loading…":d.orders?.length?d.orders.map(o=><div key={o.id} style={line}><b>{o.offer_kind} · {o.status}</b><span>{money(o.retail_amount_kobo)}</span><small>{date(o.created_at)} · <Link href={"/dashboard/orders/"+o.id}>View details</Link></small></div>):<Empty text="Your number orders will appear here after your first purchase."/ >}</section>:null}
-{section==="messages"?<section style={card}><h2>SMS inbox</h2>{loading?"Loading…":d.messages?.length?d.messages.map(m=><div key={m.id} style={line}><b>{m.sender||"Message received"}</b><span>{m.status}</span><small>{date(m.received_at)}</small></div>):<Empty text="No verification messages yet."/ >}</section>:null}
-{section==="notifications"?<section style={card}><h2>Notifications</h2>{loading?"Loading…":d.notifications?.length?d.notifications.map(n=><div key={n.id} style={line}><b>{n.title}</b><span>{n.body}</span><small>{date(n.created_at)}</small></div>):<Empty text="You're all caught up."/ >}</section>:null}
-{section==="support"?<section style={card}><h2>How can we help?</h2><p className="workspace-muted">For account, payment or order support, contact our support team.</p><a className="workspace-action" href="mailto:support@iceyvault.com">Email support <ArrowRight size={15}/></a></section>:null}{notice?<div role="status" style={card}>{notice}</div>:null}</>}
-function Empty({text}:{text:string}){return <div className="workspace-empty"><ShieldCheck size={24} style={{margin:"0 auto 10px",color:"#6d5bd0"}}/><p>{text}</p></div>}const line:React.CSSProperties={display:"grid",gridTemplateColumns:"minmax(0,1fr) auto",gap:5,padding:"13px 0",borderBottom:"1px solid #eee",fontSize:12};
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { ArrowUpRight, CheckCircle2, Clock3, RefreshCw, ShieldCheck, Wallet, MapPin, Save, ShoppingBag } from "lucide-react";
+
+type Profile = {
+  display_name: string | null;
+  phone_e164: string | null;
+  billing_address_line1: string | null;
+  billing_city: string | null;
+  billing_state: string | null;
+  billing_postal_code: string | null;
+  billing_country: string | null;
+};
+type Transaction = { id: string; direction: string; amount_kobo: number; description: string | null; created_at: string };
+type Order = { id: string; status: string; retail_amount_kobo: number; created_at: string; offer_kind: string };
+type D = {
+  profile?: Profile | null;
+  wallet?: { balance_kobo: number; currency: string } | null;
+  orders?: Order[];
+  messages?: Array<{ id: string; sender: string | null; received_at: string; status: string }>;
+  notifications?: Array<{ id: string; title: string; body: string; created_at: string }>;
+  transactions?: Transaction[];
+  email?: string;
+};
+type C = { services: Array<{ id: string; display_name: string }>; tiers: Array<{ id: string; service_id: string; tier_label: string; country_iso2: string; retail_price_kobo: number; last_inventory_count: number | null }> };
+type Billing = { line1: string; city: string; state: string; postal_code: string; country: string };
+const blankBilling: Billing = { line1: "", city: "", state: "", postal_code: "", country: "NG" };
+const pages: Record<string, { title: string; description: string }> = {
+  catalog: { title: "Browse services", description: "Choose a verified service and a live, available number." },
+  orders: { title: "My orders", description: "Track your number activations and order history." },
+  wallet: { title: "Wallet", description: "Manage your NGN balance, fund securely and review every transaction." },
+  messages: { title: "SMS inbox", description: "Verification messages for your active number orders." },
+  notifications: { title: "Notifications", description: "Important updates about your account and orders." },
+  support: { title: "Support centre", description: "Get help with account access, payments and orders." },
+  settings: { title: "Account settings", description: "Keep your contact and billing details up to date." },
+};
+const money = (v: number) => "₦" + (v / 100).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const date = (v: string) => new Date(v).toLocaleString("en-NG", { dateStyle: "medium", timeStyle: "short" });
+
+export default function CustomerSection({ section }: { section: string }) {
+  const item = pages[section] || pages.catalog;
+  const [d, setD] = useState<D>({});
+  const [c, setC] = useState<C>({ services: [], tiers: [] });
+  const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState("");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [billing, setBilling] = useState<Billing>(blankBilling);
+  const [fundAmount, setFundAmount] = useState("1000");
+  const [buying, setBuying] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [lastOrderId, setLastOrderId] = useState<string | null>(null);
+
+  async function load() {
+    try {
+      const r = await fetch("/api/account/overview", { cache: "no-store" });
+      if (r.ok) {
+        const j = await r.json();
+        setD(j);
+        setName(j.profile?.display_name || "");
+        setPhone(j.profile?.phone_e164 || "");
+        setBilling({
+          line1: j.profile?.billing_address_line1 || "",
+          city: j.profile?.billing_city || "",
+          state: j.profile?.billing_state || "",
+          postal_code: j.profile?.billing_postal_code || "",
+          country: j.profile?.billing_country || "NG",
+        });
+      } else {
+        setNotice("We couldn't refresh your account details. Please try again.");
+      }
+      if (section === "catalog") {
+        const q = await fetch("/api/account/catalogue", { cache: "no-store" });
+        if (q.ok) setC(await q.json());
+      }
+    } catch {
+      setNotice("Account data is temporarily unavailable. Please retry.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { void load(); }, [section]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const reference = params.get("reference");
+    if (section === "wallet" && params.get("payment") === "pending" && reference) {
+      fetch("/api/account/wallet/verify?reference=" + encodeURIComponent(reference), { cache: "no-store" })
+        .then(async (r) => {
+          const j = await r.json();
+          setNotice(j.status === "successful"
+            ? (j.credited ? "Payment confirmed. Your wallet has been credited." : "Payment was already credited.")
+            : j.status === "failed"
+              ? "Flutterwave marked this payment as failed. No wallet funds were added."
+              : "Payment is awaiting Flutterwave confirmation. Your wallet has not been credited yet.");
+          if (j.status === "successful" || j.status === "failed") {
+            const amount = localStorage.getItem("iceyvault:fund-ref:" + reference);
+            if (amount) localStorage.removeItem("iceyvault:fund:" + amount);
+            localStorage.removeItem("iceyvault:fund-ref:" + reference);
+          }
+          await load();
+        })
+        .catch(() => setNotice("We couldn't verify the payment yet. Your balance has not been changed; refresh shortly."));
+    }
+  }, [section]);
+
+  async function saveProfile(e?: React.FormEvent) {
+    e?.preventDefault();
+    setSaving(true);
+    try {
+      const r = await fetch("/api/account/overview", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          display_name: name,
+          phone_e164: phone || null,
+          billing_address_line1: billing.line1 || null,
+          billing_city: billing.city || null,
+          billing_state: billing.state || null,
+          billing_postal_code: billing.postal_code || null,
+          billing_country: billing.country || "NG",
+        }),
+      });
+      const j = await r.json();
+      setNotice(r.ok ? "Your account and billing details have been saved." : j.error || "Could not save your details.");
+      if (r.ok) await load();
+    } catch {
+      setNotice("Could not reach the account service. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function changePassword(e: React.FormEvent) {
+    e.preventDefault();
+    const r = await fetch("/api/account/password", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password }),
+    });
+    const j = await r.json();
+    setNotice(r.ok ? "Password updated successfully." : j.error || "Could not update password.");
+    if (r.ok) setPassword("");
+  }
+
+  async function fundWallet() {
+    const amountKobo = Math.round(Number(fundAmount) * 100);
+    if (!Number.isFinite(amountKobo) || amountKobo < 5000 || amountKobo > 50000000) {
+      setNotice("Enter an amount between ₦50 and ₦500,000.");
+      return;
+    }
+    if (!billing.line1.trim() || !billing.city.trim() || !billing.state.trim() || !billing.postal_code.trim()) {
+      setNotice("Complete and save your billing address before continuing to Flutterwave.");
+      return;
+    }
+    setBuying(true);
+    setNotice("Preparing your secure Flutterwave checkout…");
+    const storageKey = "iceyvault:fund:" + amountKobo;
+    try {
+      const idempotencyKey = localStorage.getItem(storageKey) || crypto.randomUUID();
+      localStorage.setItem(storageKey, idempotencyKey);
+      const r = await fetch("/api/account/wallet/fund", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amountKobo, idempotencyKey }),
+      });
+      const j = await r.json();
+      if (j.reference) localStorage.setItem("iceyvault:fund-ref:" + j.reference, String(amountKobo));
+      if (!r.ok && r.status !== 202) {
+        if (r.status === 409 || r.status === 400 || r.status === 502) localStorage.removeItem(storageKey);
+        setNotice(j.error || "Could not start checkout.");
+        return;
+      }
+      if (j.checkoutUrl) {
+        window.location.assign(j.checkoutUrl);
+        return;
+      }
+      setNotice(j.error || "Your payment request is being reconciled. Do not create another payment yet.");
+    } catch {
+      setNotice("We couldn't confirm the checkout response. Retry with the same amount so the same request key is reused.");
+    } finally {
+      setBuying(false);
+    }
+  }
+
+  async function buyNumber(tierId: string) {
+    setBuying(true);
+    setNotice("Reserving your number with SMSCode…");
+    const storageKey = "iceyvault:order:" + tierId;
+    try {
+      const idempotencyKey = localStorage.getItem(storageKey) || crypto.randomUUID();
+      localStorage.setItem(storageKey, idempotencyKey);
+      const r = await fetch("/api/account/orders", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tierId, idempotencyKey }),
+      });
+      const j = await r.json();
+      if (j.orderId) setLastOrderId(j.orderId);
+      if (r.status === 201 || r.status === 200) {
+        localStorage.removeItem(storageKey);
+        setNotice("Number purchased successfully.");
+        await load();
+      } else {
+        if (r.status !== 202 && r.status !== 402) localStorage.removeItem(storageKey);
+        setNotice(j.message || j.error || "Could not complete this purchase.");
+      }
+    } catch {
+      setNotice("The request may still be processing. Check My orders before trying again.");
+    } finally {
+      setBuying(false);
+    }
+  }
+
+  async function refresh() {
+    setLoading(true);
+    await load();
+  }
+
+  const field = (label: string, value: string, onChange: (v: string) => void, placeholder: string, required = true) => (
+    <label className="workspace-field">
+      <span>{label}</span>
+      <input className="workspace-input" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} required={required} />
+    </label>
+  );
+
+  return (
+    <>
+      <section className="workspace-page-heading">
+        <div>
+          <span className="workspace-eyebrow">YOUR ACCOUNT</span>
+          <h1>{item.title}</h1>
+          <p>{item.description}</p>
+        </div>
+        <button className="workspace-quiet-button" onClick={() => void refresh()} disabled={loading} aria-label="Refresh page data">
+          <RefreshCw size={16} className={loading ? "workspace-spin" : ""} /> Refresh
+        </button>
+      </section>
+
+      {section === "wallet" ? (
+        <>
+          <section className="wallet-overview">
+            <div className="wallet-overview-copy">
+              <span className="workspace-eyebrow">AVAILABLE BALANCE</span>
+              <div className="wallet-amount">{loading ? "—" : d.wallet ? money(d.wallet.balance_kobo) : "₦0.00"}</div>
+              <p>NGN wallet · Your balance updates after confirmed payments and purchases.</p>
+            </div>
+            <div className="wallet-icon"><Wallet size={25} /></div>
+          </section>
+
+          <section className="workspace-panel">
+            <div className="workspace-section-title">
+              <div><h2>Add funds</h2><p>Secure checkout powered by Flutterwave.</p></div>
+              <span className="workspace-secure"><ShieldCheck size={15}/> Secure</span>
+            </div>
+            <div className="workspace-amount-choices">
+              {["1000", "2500", "5000", "10000"].map((v) => (
+                <button type="button" key={v} className={fundAmount === v ? "workspace-chip selected" : "workspace-chip"} onClick={() => setFundAmount(v)}>₦{Number(v).toLocaleString("en-NG")}</button>
+              ))}
+            </div>
+            <div className="workspace-fund-row">
+              <label className="workspace-field workspace-fund-input">
+                <span>Amount to add (NGN)</span>
+                <div className="workspace-currency-input"><span>₦</span><input className="workspace-input" type="number" min="50" max="500000" step="50" value={fundAmount} onChange={(e) => setFundAmount(e.target.value)} /></div>
+              </label>
+              <button className="workspace-primary workspace-fund-button" onClick={() => void fundWallet()} disabled={buying || saving}>
+                {buying ? "Preparing checkout…" : "Continue to payment"} <ArrowUpRight size={17}/>
+              </button>
+            </div>
+            <p className="workspace-helper">Minimum ₦50 · Maximum ₦500,000. Your wallet is credited only after Flutterwave confirms the exact amount and reference.</p>
+          </section>
+
+          <section className="workspace-panel">
+            <div className="workspace-section-title">
+              <div><h2>Billing details</h2><p>Flutterwave requires a billing address to create a payment order.</p></div>
+              <MapPin size={20} className="workspace-purple-icon"/>
+            </div>
+            <div className="workspace-form-grid">
+              {field("Street address", billing.line1, (v) => setBilling({ ...billing, line1: v }), "House number and street")}
+              {field("City", billing.city, (v) => setBilling({ ...billing, city: v }), "Your city")}
+              {field("State", billing.state, (v) => setBilling({ ...billing, state: v }), "Your state")}
+              {field("Postal code", billing.postal_code, (v) => setBilling({ ...billing, postal_code: v }), "Postal / ZIP code")}
+              <label className="workspace-field"><span>Country</span><select className="workspace-input" value={billing.country} onChange={(e) => setBilling({ ...billing, country: e.target.value })}><option value="NG">Nigeria</option><option value="GH">Ghana</option><option value="US">United States</option><option value="GB">United Kingdom</option></select></label>
+            </div>
+            <div className="workspace-form-footer">
+              <p className="workspace-helper">Your billing details are stored securely in your account and used for payment processing.</p>
+              <button className="workspace-secondary" onClick={() => void saveProfile()} disabled={saving}><Save size={15}/>{saving ? "Saving…" : "Save billing details"}</button>
+            </div>
+          </section>
+
+          <section className="workspace-panel">
+            <div className="workspace-section-title"><div><h2>Wallet transactions</h2><p>Your confirmed wallet activity.</p></div><span className="workspace-count">{d.transactions?.length || 0}</span></div>
+            {loading ? <Empty text="Loading transactions…"/> : d.transactions?.length ? (
+              <div className="workspace-list">{d.transactions.map((t) => (
+                <div className="workspace-list-row" key={t.id}>
+                  <span className="workspace-list-icon"><Wallet size={17}/></span>
+                  <div className="workspace-list-main"><b>{t.description || t.direction}</b><small>{date(t.created_at)}</small></div>
+                  <strong className={t.direction === "credit" ? "amount-positive" : "amount-negative"}>{t.direction === "credit" ? "+" : "−"}{money(t.amount_kobo)}</strong>
+                </div>
+              ))}</div>
+            ) : <Empty text="No wallet transactions yet. Your first confirmed top-up will appear here."/>}
+          </section>
+        </>
+      ) : null}
+
+      {section === "settings" ? (
+        <>
+          <section className="workspace-panel">
+            <div className="workspace-section-title"><div><h2>Personal information</h2><p>Keep your account contact details current.</p></div></div>
+            <form onSubmit={(e) => void saveProfile(e)} className="workspace-form-grid">
+              {field("Display name", name, setName, "Your name")}
+              <label className="workspace-field"><span>Email address</span><input className="workspace-input" value={d.email || ""} disabled/></label>
+              {field("Phone number", phone, setPhone, "+234…", false)}
+              <div className="workspace-form-footer full-width"><button className="workspace-primary" disabled={saving}>{saving ? "Saving…" : "Save changes"}</button></div>
+            </form>
+          </section>
+          <section className="workspace-panel">
+            <div className="workspace-section-title"><div><h2>Billing address</h2><p>Used to process wallet payments through Flutterwave.</p></div></div>
+            <div className="workspace-form-grid">
+              {field("Street address", billing.line1, (v) => setBilling({ ...billing, line1: v }), "House number and street")}
+              {field("City", billing.city, (v) => setBilling({ ...billing, city: v }), "Your city")}
+              {field("State", billing.state, (v) => setBilling({ ...billing, state: v }), "Your state")}
+              {field("Postal code", billing.postal_code, (v) => setBilling({ ...billing, postal_code: v }), "Postal / ZIP code")}
+              <label className="workspace-field"><span>Country</span><select className="workspace-input" value={billing.country} onChange={(e) => setBilling({ ...billing, country: e.target.value })}><option value="NG">Nigeria</option><option value="GH">Ghana</option><option value="US">United States</option><option value="GB">United Kingdom</option></select></label>
+              <div className="workspace-form-footer full-width"><button className="workspace-primary" onClick={() => void saveProfile()} disabled={saving}><Save size={15}/>{saving ? "Saving…" : "Save billing address"}</button></div>
+            </div>
+          </section>
+          <section className="workspace-panel">
+            <div className="workspace-section-title"><div><h2>Password & security</h2><p>Choose a strong password you don't use elsewhere.</p></div><ShieldCheck className="workspace-purple-icon"/></div>
+            <form onSubmit={(e) => void changePassword(e)} className="workspace-password-form"><label className="workspace-field"><span>New password</span><input className="workspace-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={10} required placeholder="At least 10 characters"/></label><button className="workspace-secondary">Update password</button></form>
+          </section>
+        </>
+      ) : null}
+
+      {section === "catalog" ? (
+        <section className="workspace-panel">
+          <div className="workspace-section-title"><div><h2>Available number services</h2><p>Only supplier-verified products with stock and approved retail pricing are shown.</p></div><span className="workspace-count">{c.tiers.length}</span></div>
+          {loading ? <Empty text="Checking verified catalogue…"/> : c.tiers.length ? (
+            <div className="workspace-product-grid">{c.tiers.map((t) => (
+              <article className="workspace-product-card" key={t.id}>
+                <div className="workspace-product-top"><span className="workspace-product-icon"><ShoppingBag size={19}/></span><span className="workspace-stock">{t.last_inventory_count ?? 0} in stock</span></div>
+                <span className="workspace-product-country">{t.country_iso2}</span>
+                <h3>{c.services.find((s) => s.id === t.service_id)?.display_name || "Service"}</h3>
+                <p>{t.tier_label}</p>
+                <div className="workspace-product-bottom"><strong>{money(t.retail_price_kobo)}</strong><button className="workspace-primary" disabled={buying || (t.last_inventory_count ?? 0) < 1} onClick={() => void buyNumber(t.id)}>{buying ? "Processing…" : "Buy number"}</button></div>
+              </article>
+            ))}</div>
+          ) : <Empty text="No verified products are published yet. The supplier catalogue must be synced, priced and activated by an administrator first."/>}
+          {lastOrderId ? <p className="workspace-inline-link"><Link href={"/dashboard/orders/" + lastOrderId}>View your new order <ArrowUpRight size={15}/></Link></p> : null}
+        </section>
+      ) : null}
+
+      {section === "orders" ? (
+        <section className="workspace-panel"><div className="workspace-section-title"><div><h2>Order history</h2><p>All your number activations in one place.</p></div><span className="workspace-count">{d.orders?.length || 0}</span></div>
+          {loading ? <Empty text="Loading your orders…"/> : d.orders?.length ? <div className="workspace-list">{d.orders.map((o) => <div className="workspace-list-row" key={o.id}><span className="workspace-list-icon"><ShoppingBag size={17}/></span><div className="workspace-list-main"><b>{o.offer_kind.replaceAll("_", " ")} · {o.status.replaceAll("_", " ")}</b><small>{date(o.created_at)}</small><Link href={"/dashboard/orders/" + o.id}>View order details</Link></div><strong>{money(o.retail_amount_kobo)}</strong></div>)}</div> : <Empty text="Your number orders will appear here after your first purchase."/>}
+        </section>
+      ) : null}
+
+      {section === "messages" ? <section className="workspace-panel"><div className="workspace-section-title"><div><h2>SMS inbox</h2><p>Verification messages linked to your orders.</p></div></div>{loading ? <Empty text="Loading messages…"/> : d.messages?.length ? <div className="workspace-list">{d.messages.map((m) => <div className="workspace-list-row" key={m.id}><span className="workspace-list-icon"><CheckCircle2 size={17}/></span><div className="workspace-list-main"><b>{m.sender || "Message received"}</b><small>{date(m.received_at)}</small></div><span className="workspace-status">{m.status}</span></div>)}</div> : <Empty text="No verification messages yet."/>}</section> : null}
+
+      {section === "notifications" ? <section className="workspace-panel"><div className="workspace-section-title"><div><h2>Notifications</h2><p>Updates about your account and services.</p></div></div>{loading ? <Empty text="Loading notifications…"/> : d.notifications?.length ? <div className="workspace-list">{d.notifications.map((n) => <div className="workspace-list-row" key={n.id}><span className="workspace-list-icon"><Clock3 size={17}/></span><div className="workspace-list-main"><b>{n.title}</b><small>{n.body}</small><small>{date(n.created_at)}</small></div></div>)}</div> : <Empty text="You're all caught up."/>}</section> : null}
+
+      {section === "support" ? <section className="workspace-panel"><div className="workspace-section-title"><div><h2>Support centre</h2><p>Our team can help with account access, payments and orders.</p></div></div><a className="workspace-primary workspace-support-link" href="mailto:support@iceyvault.com">Email support <ArrowUpRight size={16}/></a></section> : null}
+
+      {notice ? <div className="workspace-notice" role="status"><ShieldCheck size={18}/><span>{notice}</span></div> : null}
+    </>
+  );
+}
+
+function Empty({ text }: { text: string }) {
+  return <div className="workspace-empty"><ShieldCheck size={25}/><p>{text}</p></div>;
+}
