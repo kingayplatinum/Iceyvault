@@ -52,9 +52,12 @@ export async function flutterwaveV4Request<T>(
   const payload = await response.json().catch(() => null) as FlutterwaveEnvelope<T> | null;
   if (!response.ok || payload?.status === "failed" || payload?.data === undefined) {
     const message = payload?.error?.message || payload?.message || `Flutterwave V4 request failed (${response.status}).`;
-    const error = new Error(message) as Error & { status?: number; providerCode?: string };
+    const validationErrors = payload?.error?.validation_errors ?? [];
+    const detail = validationErrors.map((item) => [item.field_name, item.message].filter(Boolean).join(": ")).filter(Boolean).join("; ");
+    const error = new Error(detail || message) as Error & { status?: number; providerCode?: string; validationErrors?: Array<{ field_name?: string; message?: string }> };
     error.status = response.status;
     error.providerCode = payload?.error?.code;
+    error.validationErrors = validationErrors;
     throw error;
   }
   return { data: payload.data, status: response.status };
