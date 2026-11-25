@@ -104,9 +104,8 @@ export async function POST(request: NextRequest) {
       if (!stored) continue;
 
       let page = 1;
-      let expectedCount = Number.POSITIVE_INFINITY;
       let serviceHasStock = false;
-      while ((page - 1) * 1000 < expectedCount) {
+      while (true) {
         stage = `products:${country.code}:${remoteService.code}:page:${page}`;
         const params = new URLSearchParams({
           country_id: String(country.id),
@@ -116,9 +115,6 @@ export async function POST(request: NextRequest) {
         });
         const response = await smscodeRequest<RemoteProduct[]>(`/catalog/products?${params.toString()}`);
         const meta = (response.meta ?? {}) as ProductPageMeta;
-        expectedCount = Number.isFinite(meta.count)
-          ? Number(meta.count)
-          : (page - 1) * 1000 + response.data.length;
 
         const products = response.data.filter((product) =>
           product.active && Number.isFinite(product.id) &&
@@ -194,6 +190,8 @@ export async function POST(request: NextRequest) {
           }
         }
 
+        // SMSCode meta.count is the number of rows in this page, not a global total.
+        // Continue only while the page is full; the API supports page-based pagination.
         if (response.data.length < 1000) break;
         page += 1;
       }
