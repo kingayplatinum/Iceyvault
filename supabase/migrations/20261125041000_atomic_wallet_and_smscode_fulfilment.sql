@@ -53,6 +53,7 @@ begin
   where o.user_id = p_user_id and o.idempotency_key = p_idempotency_key
   for update;
   if found then
+    if v_existing.status in ('refunded','failed','cancelled','expired','completed') then raise exception 'ORDER_ALREADY_TERMINAL'; end if;
     if v_existing.smscode_tier_id is distinct from p_tier_id then
       raise exception 'IDEMPOTENCY_KEY_REUSED';
     end if;
