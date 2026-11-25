@@ -92,7 +92,8 @@ export async function POST(request: NextRequest) {
         // bank account, USSD and other supported local methods.
         // Flutterwave account-level preferred-method settings must be disabled
         // for this per-transaction list to take effect.
-        payment_options: "card, banktransfer, account, ussd, opay, nqr, enaira, internetbanking",
+        payment_options: "card, ussd, banktransfer, account, internetbanking, nqr, enaira, opay",
+        bank_transfer_options: { expires: 3600 },
         redirect_url: redirectUrl.toString(),
         customer: {
           email: user.email,
