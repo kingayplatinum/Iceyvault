@@ -69,7 +69,25 @@ export async function POST(request: NextRequest) {
   if (paymentError || !payment) return NextResponse.json({ error: "Could not create a payment request. Please retry once." }, { status: 500 });
 
   const { data: profile } = await service.from("profiles")
-    .select("display_name,phone_e164").eq("id", user.id).maybeSingle();
+    .select("display_name,phone_e164,billing_address_line1,billing_city,billing_state,billing_postal_code,billing_country").eq("id", user.id).maybeSingle();
+  const address = {
+    line1: profile?.billing_address_line1?.trim(),
+    city: profile?.billing_city?.trim(),
+    state: profile?.billing_state?.trim(),
+    postal_code: profile?.billing_postal_code?.trim(),
+    country: (profile?.billing_country || "NG").trim().toUpperCase(),
+  };
+  if (!address.line1 || !address.city || !address.state || !address.postal_code || !/^[A-Z]{2}$/.test(address.country)) {
+    await service.from("payment_transactions").update({
+      status: "failed",
+      failure_reason: "Billing address required before Flutterwave checkout",
+      updated_at: new Date().toISOString(),
+    }).eq("id", payment.id).eq("status", "pending");
+    return NextResponse.json({
+      error: "Add your billing address (street, city, state and postal code) in Account settings before funding your wallet. No payment was initiated.",
+      code: "BILLING_ADDRESS_REQUIRED",
+    }, { status: 400 });
+  }
   const displayName = (profile?.display_name || user.email?.split("@")[0] || "IceyVault Customer").trim();
   const parts = displayName.split(/\s+/).filter(Boolean);
   const first = parts[0] && parts[0].length >= 2 ? parts[0] : "IceyVault";
@@ -124,10 +142,19 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     const status = (error as Error & { status?: number }).status;
     if (status && status >= 400 && status < 500) {
+      const providerError = error as Error & { providerCode?: string; validationErrors?: Array<{ field_name?: string; message?: string }> };
+      const validationErrors = providerError.validationErrors ?? [];
       await service.from("payment_transactions").update({
-        status: "failed", raw_event: { provider_error: (error as Error).message }, updated_at: new Date().toISOString(),
+        status: "failed",
+        raw_event: { provider_error: providerError.message, provider_code: providerError.providerCode ?? null, validation_errors: validationErrors },
+        failure_reason: validationErrors.map((item) => [item.field_name, item.message].filter(Boolean).join(": ")).join("; ").slice(0, 500) || providerError.message.slice(0, 500),
+        updated_at: new Date().toISOString(),
       }).eq("id", payment.id);
-      return NextResponse.json({ error: "Flutterwave declined the checkout request. No wallet funds were added." }, { status: 502 });
+      const detail = validationErrors.map((item) => [item.field_name, item.message].filter(Boolean).join(": ")).filter(Boolean).join(" · ");
+      return NextResponse.json({
+        error: detail ? "Flutterwave rejected the checkout details: " + detail : "Flutterwave declined the checkout request. No wallet funds were added.",
+        code: providerError.providerCode ?? "FLUTTERWAVE_REQUEST_REJECTED",
+      }, { status: 502 });
     }
     return NextResponse.json({
       error: "Flutterwave did not return a conclusive response. The payment request remains pending; retry with the same request key or contact support.",
