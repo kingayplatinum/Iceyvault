@@ -31,13 +31,23 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     }
     const { data: current } = await auth.service.from("smscode_product_tiers").select("service_id,smscode_product_id,smscode_catalog_product_id,retail_price_kobo,max_supplier_price_usd,last_supplier_price_usd,last_inventory_count,last_verified_at").eq("id", id).maybeSingle();
     if (!current) return NextResponse.json({ error: "Tier not found." }, { status: 404 });
-    const { data: service } = await auth.service.from("smscode_service_catalogue").select("supported,active").eq("id", current.service_id).maybeSingle();
+    const { data: service } = await auth.service.from("smscode_service_catalogue").select("id,supported,active").eq("id", current.service_id).maybeSingle();
     const productId = parsed.data.smscode_product_id ?? current.smscode_product_id;const catalogProductId = parsed.data.smscode_catalog_product_id ?? current.smscode_catalog_product_id;const retailPrice = parsed.data.retail_price_kobo ?? current.retail_price_kobo;const supplierCap = parsed.data.max_supplier_price_usd ?? current.max_supplier_price_usd;
-    if (!service?.supported || !service.active || !productId || !catalogProductId || retailPrice <= 0 || supplierCap < (current.last_supplier_price_usd ?? 0) || (current.last_inventory_count ?? 0) <= 0 || !current.last_verified_at || new Date(current.last_verified_at).getTime() < Date.now() - 24 * 60 * 60 * 1000) return NextResponse.json({ error: "A tier needs an active service, a verified supplier catalogue product, recently refreshed stock and a positive NGN retail price before activation." }, { status: 409 });
+    if (!service?.supported || !productId || !catalogProductId || retailPrice <= 0 || supplierCap < (current.last_supplier_price_usd ?? 0) || (current.last_inventory_count ?? 0) <= 0 || !current.last_verified_at || new Date(current.last_verified_at).getTime() < Date.now() - 24 * 60 * 60 * 1000) return NextResponse.json({ error: "A tier needs a verified supplier catalogue product, recently refreshed stock, a supplier cap that covers the live cost and a positive NGN retail price before activation." }, { status: 409 });
   }
   const { data, error } = await auth.service.from("smscode_product_tiers").update({ ...parsed.data, updated_at: new Date().toISOString() }).eq("id", id).select().maybeSingle();
   if (error) return NextResponse.json({ error: "Could not update tier." }, { status: 500 });
   if (!data) return NextResponse.json({ error: "Tier not found." }, { status: 404 });
+  if (parsed.data.active === true) {
+    const { data: tierService } = await auth.service.from("smscode_product_tiers").select("service_id").eq("id", id).maybeSingle();
+    if (tierService?.service_id) {
+      const { data: service } = await auth.service.from("smscode_service_catalogue").select("id,active,supported").eq("id", tierService.service_id).maybeSingle();
+      if (service?.supported && !service.active) {
+        const { error: enableError } = await auth.service.from("smscode_service_catalogue").update({ active: true, updated_at: new Date().toISOString() }).eq("id", service.id);
+        if (enableError) return NextResponse.json({ error: "Tier was saved, but its parent service could not be enabled. Retry activation." }, { status: 500 });
+      }
+    }
+  }
   await auth.service.from("audit_logs").insert({ actor_user_id: auth.user.id, action: "smscode_tier_updated", entity_type: "smscode_product_tier", entity_id: id, metadata: parsed.data });
   return NextResponse.json({ tier: data });
 }
