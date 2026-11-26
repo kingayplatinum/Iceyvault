@@ -19,7 +19,7 @@ export async function GET() {
   const pageSize = 1000;
   let expectedTotal = 0;
   for (let from = 0; ; from += pageSize) {
-    const { data, error } = await auth.service
+    const { data, error, count } = await auth.service
       .from("smscode_product_tiers")
       .select("id,service_id,tier_key,tier_label,country_iso2,country_name,smscode_product_id,smscode_catalog_product_id,smscode_operator_id,max_supplier_price_usd,retail_price_kobo,active,last_supplier_price_usd,last_inventory_count,last_verified_at", { count: "exact" })
       .order("country_iso2")
