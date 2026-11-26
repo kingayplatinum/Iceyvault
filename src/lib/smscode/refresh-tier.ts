@@ -28,8 +28,11 @@ export async function refreshSmscodeTier(db: Db, tierId: string) {
   const remoteService = remoteServices.find((item) => item.active && item.code === service.sms_code_service_code);
   if (!remoteService) throw new Error("SMSCode does not currently offer this service in the selected country.");
 
-  for (let page = 1; page <= 20; page++) {
-    const params = new URLSearchParams({ country_id: String(country.id), platform_id: String(remoteService.id), limit: "1000", page: String(page) });
+  // SMSCode permits up to 10,000 products per page. The previous 20 x 1,000
+  // ceiling missed valid product IDs later in large country/service catalogues.
+  const pageSize = 10000;
+  for (let page = 1; page <= 100; page++) {
+    const params = new URLSearchParams({ country_id: String(country.id), platform_id: String(remoteService.id), limit: String(pageSize), page: String(page) });
     const response = await smscodeRequest<Product[]>(`/catalog/products?${params.toString()}`);
     const product = response.data.find((item) => String(item.id) === String(tier.smscode_product_id));
     if (product) {
@@ -50,7 +53,7 @@ export async function refreshSmscodeTier(db: Db, tierId: string) {
       if (error) throw new Error("Supplier data was refreshed but could not be saved to the product tier.");
       return { available: Math.max(0, product.available), supplierCost, active: product.active };
     }
-    if (response.data.length < 1000) break;
+    if (response.data.length < pageSize) break;
   }
-  throw new Error("The selected product was not found in the current SMSCode catalogue.");
+  throw new Error("SMSCode did not return this exact supplier product after checking the current catalogue pages. It may have been withdrawn or replaced; refresh this country/service and select a currently listed product. Existing pricing has been left unchanged.");
 }
