@@ -1,5 +1,5 @@
 "use client";
-import {useEffect,useMemo,useState} from "react";
+import {useEffect,useMemo,useRef,useState} from "react";
 import {Activity,CheckCircle2,CircleAlert,CloudDownload,CreditCard,Database,RefreshCw,ShieldCheck,Smartphone,Wallet} from "lucide-react";
 import "./admin.css";
 type S={id:string;display_name:string;supported:boolean;active:boolean;last_verified_at?:string|null};
@@ -11,17 +11,29 @@ export default function AdminPage(){
  const [services,setServices]=useState<S[]>([]),[tiers,setTiers]=useState<T[]>([]),[countries,setCountries]=useState<C[]>([]);
  const [connection,setConnection]=useState<{connected?:boolean;message?:string;mode?:string;missing?:string[]}>({}),[flutterwave,setFlutterwave]=useState<{connected?:boolean;message?:string}>({});
  const [webhook,setWebhook]=useState(false),[busy,setBusy]=useState(false),[syncing,setSyncing]=useState(false),[loading,setLoading]=useState(true),[notice,setNotice]=useState<N|null>(null);
- const [countryFilter,setCountryFilter]=useState("US"),[serviceFilter,setServiceFilter]=useState(""),[selectedTierId,setSelectedTierId]=useState(""),[config,setConfig]=useState({cap:"",retail:""}),[filter,setFilter]=useState(""),[catalogueServiceFilter,setCatalogueServiceFilter]=useState("all"),[catalogueServiceSearch,setCatalogueServiceSearch]=useState(""),[editing,setEditing]=useState<string|null>(null),[draft,setDraft]=useState({cap:"",retail:""});
+ const [countryFilter,setCountryFilter]=useState("US"),[serviceFilter,setServiceFilter]=useState(""),[selectedTierId,setSelectedTierId]=useState(""),[config,setConfig]=useState({cap:"",retail:""}),[filter,setFilter]=useState(""),[tierServiceFilter,setTierServiceFilter]=useState("all"),[catalogueServiceFilter,setCatalogueServiceFilter]=useState("all"),[catalogueServiceSearch,setCatalogueServiceSearch]=useState(""),[editing,setEditing]=useState<string|null>(null),[draft,setDraft]=useState({cap:"",retail:""});
  const active=useMemo(()=>tiers.filter(t=>t.active).length,[tiers]),stock=useMemo(()=>tiers.filter(t=>(t.last_inventory_count||0)>0).length,[tiers]);
  const matchingServices=useMemo(()=>services.filter(s=>s.display_name.toLowerCase().includes(catalogueServiceSearch.toLowerCase())),[services,catalogueServiceSearch]);
- const shown=useMemo(()=>tiers.filter(t=>(catalogueServiceFilter==="all"||t.service_id===catalogueServiceFilter)&&((services.find(s=>s.id===t.service_id)?.display_name||"")+" "+t.tier_label+" "+t.tier_key+" "+(t.country_name||t.country_iso2)).toLowerCase().includes(filter.toLowerCase())),[tiers,services,filter,catalogueServiceFilter]);
+ const shown=useMemo(()=>tiers.filter(t=>(catalogueServiceFilter==="all"||t.service_id===catalogueServiceFilter)&&((services.find(s=>s.id===t.service_id)?.display_name||"")+" "+t.tier_label+" "+t.tier_key+" "+(t.country_name||t.country_iso2)).toLowerCase().includes(filter.toLowerCase())&&(tierServiceFilter==="all"||t.service_id===tierServiceFilter)),[tiers,services,filter,catalogueServiceFilter,tierServiceFilter]);
  const countryOptions=countries;
  const countryTiers=useMemo(()=>tiers.filter(t=>t.country_iso2===countryFilter),[tiers,countryFilter]);
  const availableServices=useMemo(()=>services.filter(s=>countryTiers.some(t=>t.service_id===s.id)),[services,countryTiers]);
  const productOptions=useMemo(()=>countryTiers.filter(t=>t.service_id===serviceFilter),[countryTiers,serviceFilter]);
  const selectedTier=tiers.find(t=>t.id===selectedTierId)||null; const visibleTiers=shown.slice(0,100);
- async function load(silent=false){if(!silent)setLoading(true);try{const rs=await Promise.all([fetch("/api/admin/smscode/catalogue",{cache:"no-store"}),fetch("/api/admin/smscode/connection",{cache:"no-store"}),fetch("/api/admin/flutterwave/connection",{cache:"no-store"}),fetch("/api/admin/smscode/webhook",{cache:"no-store"})]);if(!rs[0].ok){const j=await rs[0].json().catch(()=>({}));setNotice({kind:"error",title:"Admin data unavailable",body:j.error||"Administrator sign-in is required."});return;}const [c,s,f,w]=await Promise.all(rs.map(r=>r.json().catch(()=>({}))));setServices(c.services||[]);setTiers(c.tiers||[]);setCountries(c.countries||[]);setConnection(s);setFlutterwave(f);setWebhook(Boolean(w.configured));}catch{setNotice({kind:"error",title:"Connection problem",body:"Could not load the admin workspace. Retry in a moment."});}finally{setLoading(false);}}
+ async function load(silent=false){if(!silent)setLoading(true);try{const rs=await Promise.all([fetch("/api/admin/smscode/catalogue?country="+encodeURIComponent(countryFilter)+(serviceFilter?"&service="+encodeURIComponent(serviceFilter):""),{cache:"no-store"}),fetch("/api/admin/smscode/connection",{cache:"no-store"}),fetch("/api/admin/flutterwave/connection",{cache:"no-store"}),fetch("/api/admin/smscode/webhook",{cache:"no-store"})]);if(!rs[0].ok){const j=await rs[0].json().catch(()=>({}));setNotice({kind:"error",title:"Admin data unavailable",body:j.error||"Administrator sign-in is required."});return;}const [c,s,f,w]=await Promise.all(rs.map(r=>r.json().catch(()=>({}))));setServices(c.services||[]);setTiers(c.tiers||[]);setCountries(c.countries||[]);setConnection(s);setFlutterwave(f);setWebhook(Boolean(w.configured));}catch{setNotice({kind:"error",title:"Connection problem",body:"Could not load the admin workspace. Retry in a moment."});}finally{setLoading(false);}}
  useEffect(()=>{void load();},[]);
+ async function loadCatalogue(){
+  try{
+   const query="/api/admin/smscode/catalogue?country="+encodeURIComponent(countryFilter)+(serviceFilter?"&service="+encodeURIComponent(serviceFilter):"");
+   const response=await fetch(query,{cache:"no-store"});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(data.error||"Could not load the selected catalogue.");
+   setServices(data.services||[]);setTiers(data.tiers||[]);setCountries(data.countries||[]);
+  }catch(error){setNotice({kind:"error",title:"Catalogue refresh failed",body:error instanceof Error?error.message:"Could not refresh products."});}
+ }
+ const catalogueFirstRender=useRef(true);
+ useEffect(()=>{if(catalogueFirstRender.current){catalogueFirstRender.current=false;return;}void loadCatalogue();},[countryFilter,serviceFilter]);
+
  useEffect(()=>{if(!countryOptions.some(c=>c.code===countryFilter)&&countryOptions.length)setCountryFilter(countryOptions[0].code);},[countryOptions,countryFilter]);
  useEffect(()=>{if(!availableServices.some(s=>s.id===serviceFilter))setServiceFilter(availableServices[0]?.id||"");},[availableServices,serviceFilter]);
  useEffect(()=>{if(!productOptions.some(t=>t.id===selectedTierId)){const next=productOptions[0];setSelectedTierId(next?.id||"");setConfig(next?{cap:String(next.max_supplier_price_usd),retail:String(next.retail_price_kobo/100)}:{cap:"",retail:""});}},[productOptions,selectedTierId]);
@@ -54,7 +66,7 @@ export default function AdminPage(){
     totals.refreshed+=result.productsRefreshed||0;
    }
    setNotice({kind:"success",title:"Full supplier catalogue synchronised",body:completed+" countries · "+totals.services+" services · "+totals.seen+" products · "+totals.inserted+" new tiers · "+totals.refreshed+" refreshed",detail:"All imported products remain inactive until you configure retail pricing and explicitly activate them."});
-   await load(true);
+   await loadCatalogue();
   }catch(error){
    setNotice({kind:"error",title:"Supplier catalogue sync stopped",body:error instanceof Error?error.message:"Could not complete the SMSCode catalogue import.",detail:completed+" countries completed before the error. Run Sync catalogue again to safely resume; existing prices and activation settings are preserved."});
    await load(true);
@@ -88,7 +100,7 @@ export default function AdminPage(){
  <div className="admin-form-submit"><button className="admin-button admin-button-primary" disabled={busy||!selectedTier||!config.cap||!config.retail}><ShieldCheck size={15}/> Save product pricing</button><small>Imported products remain inactive until you separately activate them.</small></div>
  </form>
  </section>
- <section className="admin-section"><div className="admin-section-heading admin-tier-heading"><div><span className="admin-eyebrow">03 / INVENTORY & PRICING</span><h2>Configured product tiers</h2><p>Review supplier costs, inventory and customer pricing before activation.</p></div><label className="admin-search"><span>Search tiers</span><input className="admin-input" value={filter} onChange={e=>setFilter(e.target.value)} placeholder="Service, product or ID…"/></label></div>
+ <section className="admin-section"><div className="admin-section-heading admin-tier-heading"><div><span className="admin-eyebrow">03 / INVENTORY & PRICING</span><h2>Configured product tiers</h2><p>Review supplier costs, inventory and customer pricing before activation.</p></div><div className="admin-tier-filters"><label className="admin-field"><span>Filter by service</span><select className="admin-input" value={tierServiceFilter} onChange={e=>setTierServiceFilter(e.target.value)}><option value="all">All seven services</option>{services.map(s=><option key={s.id} value={s.id}>{s.display_name}</option>)}</select></label><label className="admin-search"><span>Search tiers</span><input className="admin-input" value={filter} onChange={e=>setFilter(e.target.value)} placeholder="Search product or ID…"/></label></div></div>
  {shown.length?<><p className="admin-catalogue-count">Showing {visibleTiers.length} of {shown.length.toLocaleString()} matching imported products. Search to narrow the list.</p><div className="admin-tier-list">{visibleTiers.map(t=>{const serviceName=services.find(s=>s.id===t.service_id)?.display_name||"Service";return <article className="admin-tier-card" key={t.id}><div className="admin-tier-main"><span className="admin-tier-icon"><Smartphone size={18}/></span><div><b>{serviceName} · {t.tier_label}</b><small>{t.country_name||t.country_iso2} ({t.country_iso2}) · Supplier ID {t.smscode_product_id||"not mapped"}{t.smscode_operator_id?" · Operator "+t.smscode_operator_id:""}</small></div></div>
  <div className="admin-tier-data"><span><small>Supplier cap</small><b>{"$"+Number(t.max_supplier_price_usd).toFixed(4)}</b></span><span><small>Retail price</small><b>{money(t.retail_price_kobo)}</b></span><span><small>Last supplier cost</small><b>{t.last_supplier_price_usd==null?"—":"$"+Number(t.last_supplier_price_usd).toFixed(4)}</b></span><span><small>Inventory</small><b>{t.last_inventory_count??"—"}</b></span></div>
  {editing===t.id?<div className="admin-tier-edit"><label className="admin-field"><span>Max supplier USD</span><input className="admin-input" type="number" min="0" step="0.0001" value={draft.cap} onChange={e=>setDraft({...draft,cap:e.target.value})}/></label><label className="admin-field"><span>Retail NGN</span><input className="admin-input" type="number" min="0" step="1" value={draft.retail} onChange={e=>setDraft({...draft,retail:e.target.value})}/></label><button className="admin-button admin-button-primary" disabled={busy} onClick={()=>{void updateTier(t,{max_supplier_price_usd:Number(draft.cap),retail_price_kobo:Math.round(Number(draft.retail)*100)});setEditing(null);}}>Save pricing</button><button className="admin-button admin-button-light" onClick={()=>setEditing(null)}>Cancel</button></div>:null}
