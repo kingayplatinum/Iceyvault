@@ -18,6 +18,11 @@ type ProductPageMeta = { page?: number; limit?: number; count?: number; fx?: { r
 const keyFor = (name: string) => name.toLowerCase().normalize("NFKD")
   .replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 64);
 
+// IceyVault's approved launch catalogue. Never import every SMSCode service.
+const ALLOWED_SERVICE_KEYS = new Set([
+  "whatsapp", "telegram", "facebook", "google", "signal", "textfree", "google_voice",
+]);
+
 export async function POST(request: NextRequest) {
   const auth = await requireAdmin();
   if ("response" in auth) return auth.response;
@@ -51,11 +56,11 @@ export async function POST(request: NextRequest) {
     const { data: remoteServices } = await smscodeRequest<RemoteService[]>(
       `/catalog/services?country_id=${country.id}`
     );
-    const services = remoteServices.filter((service) => service.active && service.code && service.name);
+    const services = remoteServices.filter((service) => service.active && service.code && service.name && ALLOWED_SERVICE_KEYS.has(keyFor(service.name)));
     if (!services.length) {
       return NextResponse.json({
         country: country.name, servicesSynced: 0, productsSeen: 0,
-        productsInserted: 0, productsRefreshed: 0, note: "No active services are currently listed for this country.",
+        productsInserted: 0, productsRefreshed: 0, note: "No active services from IceyVault’s approved seven-service catalogue are listed for this country.",
       });
     }
 
@@ -234,7 +239,7 @@ export async function POST(request: NextRequest) {
       productsInserted,
       productsRefreshed,
       servicesWithStock,
-      note: "Imported products remain inactive with zero NGN retail price. Existing retail prices, supplier caps and activation states are preserved when refreshing the catalogue.",
+      note: "Only WhatsApp, Telegram, Facebook, Google, Signal, TextFree and Google Voice are imported. Imported products remain inactive with zero NGN retail price. Existing retail prices, supplier caps and activation states are preserved when refreshing the catalogue.",
     });
   } catch (error) {
     const supplierError = error as Error & { status?: number; code?: string; requestId?: string };
