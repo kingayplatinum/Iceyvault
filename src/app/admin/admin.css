@@ -281,3 +281,9 @@
 .admin-service-card button:not(:disabled),.admin-tier-actions button:not(:disabled){cursor:pointer;pointer-events:auto}
 .admin-service-card button:disabled,.admin-tier-actions button:disabled{cursor:not-allowed;opacity:.55}
 @media(max-width:720px){.admin-catalogue-toolbar{grid-template-columns:1fr}.admin-catalogue-toolbar .admin-catalogue-count{margin:0}}
+
+.admin-tier-filters{display:flex;align-items:end;gap:12px;min-width:min(520px,100%)}
+.admin-tier-filters .admin-field,.admin-tier-filters .admin-search{margin:0;min-width:190px}
+.admin-tier-filters .admin-search{display:grid;gap:6px}
+.admin-tier-filters .admin-search span{font-size:10px;font-weight:700;color:#606a7d}
+@media(max-width:760px){.admin-tier-filters{width:100%;min-width:0;flex-direction:column;align-items:stretch}.admin-tier-filters .admin-field,.admin-tier-filters .admin-search{min-width:0}}
