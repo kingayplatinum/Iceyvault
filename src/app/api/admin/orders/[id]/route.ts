@@ -16,7 +16,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
   if (error || !order) return NextResponse.json({ error: "Order not found." }, { status: 404 });
 
   const [providerResult, numberResult, messagesResult, tierResult] = await Promise.all([
-    auth.service.from("provider_orders").select("provider_order_ref,status,supplier_cost_usd,wholesale_amount_minor,wholesale_currency,last_provider_response").eq("order_id", id).maybeSingle(),
+    auth.service.from("provider_orders").select("id,provider_id,provider_order_ref,status,supplier_cost_usd,wholesale_amount_minor,wholesale_currency,supplier_fx_rate,supplier_product_id,last_provider_response").eq("order_id", id).maybeSingle(),
     order.number_id ? auth.service.from("numbers").select("e164_ciphertext,e164_last4,country_iso2,service_code,status").eq("id", order.number_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
     auth.service.from("messages").select("id,sender,body_ciphertext,received_at,status").eq("order_id", id).order("received_at", { ascending: false }).limit(30),
     order.smscode_tier_id ? auth.service.from("smscode_product_tiers").select("tier_label,country_iso2,retail_price_kobo").eq("id", order.smscode_tier_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
