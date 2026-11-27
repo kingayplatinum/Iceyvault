@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import {useEffect,useState} from "react";
-import {Wallet,ShoppingBag,MessageCircle,ArrowUpRight,Activity,RefreshCw,ShieldCheck} from "lucide-react";
+import {Wallet,ShoppingBag,MessageCircle,ArrowUpRight,Activity,RefreshCw,ShieldCheck,Phone,Users} from "lucide-react";
 type D={wallet:{balance_kobo:number;currency:string}|null;orders:Array<{id:string;status:string;retail_amount_kobo:number;created_at?:string}>;messages:Array<{id:string}>};
 const money=(v:number)=>"₦"+(v/100).toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2});
 export default function DashboardPage(){
