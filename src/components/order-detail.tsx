@@ -22,7 +22,7 @@ export default function OrderDetail({ id }: { id: string }) {
   useEffect(() => {
     void load();
     const status = detail?.order.status;
-    if (status && !["completed","expired","canceled","refunded"].includes(status)) {
+    if (status && !["completed","expired","cancelled","refunded"].includes(status)) {
       const timer = window.setInterval(() => { void load(); }, 7000);
       return () => window.clearInterval(timer);
     }
