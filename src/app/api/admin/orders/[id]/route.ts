@@ -28,7 +28,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
   let fallbackMessage: { id:string; sender:string; content:string; received_at:string } | null = null;
   // Opening an admin order also reconciles it against SMSCode. This removes the
   // old manual-review dependency when the supplier accepted but local writes/webhooks lagged.
-  if (providerResult.data && ["review_required","active","waiting_message"].includes(order.status)) {
+  if (providerResult.data && ["review_required","active","waiting_message","expired"].includes(order.status)) {
     try {
       type LiveOrder = { status:string; otp_code?:string|null; otp_message?:string|null; sms_revision?:number; expires_at?:string|null };
       const live = await smscodeRequest<LiveOrder>(`/orders/${encodeURIComponent(providerResult.data.provider_order_ref)}`);
