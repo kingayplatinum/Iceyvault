@@ -12,7 +12,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
   const { id } = await context.params;
   const service = createServiceClient();
   const { data: order, error } = await service.from("sizzle_orders")
-    .select("id,user_id,status,provider_order_ref,refill_supported,remains,start_count,supplier_charge_ngn")
+    .select("id,user_id,status,provider_order_ref,refill_supported,remains,start_count,supplier_charge_ngn,retail_amount_kobo")
     .eq("id", id).eq("user_id", user.id).maybeSingle();
   if (error || !order) return NextResponse.json({ error: "Order not found." }, { status: 404 });
   if (!order.provider_order_ref) return NextResponse.json({ order });
@@ -26,6 +26,12 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
       updated_at: new Date().toISOString(),
     };
     const { data: saved } = await service.from("sizzle_orders").update(update).eq("id", order.id).eq("user_id", user.id).select("id,status,provider_order_ref,refill_supported,remains,start_count,supplier_charge_ngn").single();
+    if (Number.isFinite(Number(live.charge))) {
+      await service.from("sizzle_cost_ledger").update({
+        supplier_cost_ngn: Number(live.charge),
+        gross_profit_ngn_kobo: Math.round(order.retail_amount_kobo - Number(live.charge) * 100),
+      }).eq("sizzle_order_id", order.id);
+    }
     return NextResponse.json({ order: saved ?? { ...order, ...update } }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return NextResponse.json({ order, refreshWarning: "Supplier status could not be refreshed right now." }, { headers: { "Cache-Control": "no-store" } });
