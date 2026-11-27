@@ -279,8 +279,34 @@ export async function POST(request: NextRequest) {
     metadata: { catalog_product_id: supplierOrder.catalog_product_id, fx_rate_as_of: supplierFxAsOf },
   });
   if (costLedgerError) {
-    await service.from("orders").update({ number_id: numberRow.id, status: "review_required", updated_at: new Date().toISOString() }).eq("id", orderId);
-    return NextResponse.json({ orderId, status: "review_required", message: "The number was purchased, but supplier cost accounting needs administrator reconciliation." }, { status: 202 });
+    // A confirmed supplier purchase and stored number must not be hidden from the
+    // customer because an accounting insert failed. Fulfil the number now and flag
+    // the ledger for background/admin reconciliation without charging again.
+    const fulfilledStatus = supplierOrder.status === "OTP_RECEIVED" ? "waiting_message" : "active";
+    await service.from("provider_orders").update({
+      last_provider_response: {
+        status: supplierOrder.status,
+        product_id: supplierOrder.product_id,
+        catalog_product_id: supplierOrder.catalog_product_id,
+        expires_at: supplierOrder.expires_at ?? null,
+        accounting_reconciliation_required: true,
+      },
+      updated_at: new Date().toISOString(),
+    }).eq("id", providerOrder.id);
+    await service.from("orders").update({
+      number_id: numberRow.id, status: fulfilledStatus, expires_at: supplierOrder.expires_at ?? null,
+      fulfilled_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }).eq("id", orderId);
+    await service.from("audit_logs").insert({
+      actor_user_id: user.id, action: "smscode_order_fulfilled_ledger_pending",
+      entity_type: "orders", entity_id: orderId,
+      metadata: { provider_order_ref: String(supplierOrder.id), reason: costLedgerError.message },
+    });
+    return NextResponse.json({
+      orderId, status: fulfilledStatus, phoneNumber: phone,
+      expiresAt: supplierOrder.expires_at ?? null, retailAmountKobo: reservation.retail_amount_kobo,
+      accountingPending: true,
+    }, { status: 201 });
   }
 
   const status = supplierOrder.status === "OTP_RECEIVED" ? "waiting_message" : "active";
