@@ -4,12 +4,14 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { decryptPrivateValue } from "@/lib/crypto-vault";
 import { smscodeRequest } from "@/lib/smscode/client";
+import { encryptPrivateValue } from "@/lib/crypto-vault";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type SupplierOrder = {
   id: number; status: string; otp_code?: string | null; otp_message?: string | null;
+  sms_revision?: number; phone_number?: string | null;
   can_resend?: boolean; can_cancel?: boolean; can_finish?: boolean; expires_at?: string | null;
 };
 
@@ -24,11 +26,66 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
     .eq("id", id).eq("user_id", user.id).maybeSingle();
   if (error || !order) return NextResponse.json({ error: "Order not found." }, { status: 404 });
 
-  const [numberResult, providerResult, messagesResult] = await Promise.all([
+  let [numberResult, providerResult, messagesResult] = await Promise.all([
     order.number_id ? service.from("numbers").select("e164_ciphertext,e164_last4").eq("id", order.number_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
-    service.from("provider_orders").select("provider_order_ref,status").eq("order_id", order.id).maybeSingle(),
+    service.from("provider_orders").select("id,provider_id,provider_order_ref,status,supplier_cost_usd,wholesale_amount_minor,wholesale_currency,supplier_fx_rate,supplier_product_id").eq("order_id", order.id).maybeSingle(),
     service.from("messages").select("id,sender,body_ciphertext,received_at,status").eq("order_id", order.id).eq("user_id", user.id).order("received_at", { ascending: false }).limit(20),
   ]);
+
+  // Self-heal orders where SMSCode accepted the purchase but the original request
+  // was interrupted before local accounting/status updates or the webhook arrived.
+  if (providerResult.data && order.number_id && ["review_required","active","waiting_message"].includes(order.status)) {
+    try {
+      const live = await smscodeRequest<SupplierOrder>(`/orders/${encodeURIComponent(providerResult.data.provider_order_ref)}`);
+      const now = new Date().toISOString();
+      if (live.data.status === "OTP_RECEIVED" && (live.data.otp_code || live.data.otp_message)) {
+        const revision = Math.max(0, Number(live.data.sms_revision) || 0);
+        const body = [live.data.otp_code ? "OTP: " + live.data.otp_code : "", live.data.otp_message || ""].filter(Boolean).join("\n");
+        if (body) {
+          const { error: messageError } = await service.from("messages").insert({
+            order_id: order.id, user_id: user.id, provider_id: providerResult.data.provider_id,
+            provider_message_ref: providerResult.data.provider_order_ref + ":" + revision,
+            sender: "SMSCode", body_ciphertext: encryptPrivateValue(body), received_at: now,
+            status: "received", retention_until: new Date(Date.now()+30*24*60*60*1000).toISOString(),
+          });
+          if (messageError && messageError.code !== "23505") throw new Error("Could not persist supplier OTP.");
+        }
+      }
+
+      if (["ACTIVE","OTP_RECEIVED","COMPLETED"].includes(live.data.status)) {
+        // A supplier purchase is already confirmed. Rebuild its missing cost ledger
+        // from the durable provider order record; do not charge the customer again.
+        const { data: ledger } = await service.from("supplier_cost_ledger").select("id").eq("order_id", order.id).maybeSingle();
+        if (!ledger && providerResult.data.wholesale_amount_minor != null && providerResult.data.wholesale_currency) {
+          const { error: ledgerError } = await service.from("supplier_cost_ledger").insert({
+            order_id: order.id, provider_order_id: providerResult.data.id, supplier_code: "smscode",
+            supplier_product_id: providerResult.data.supplier_product_id,
+            supplier_currency: providerResult.data.wholesale_currency,
+            supplier_amount_minor: providerResult.data.wholesale_amount_minor,
+            supplier_amount_usd: providerResult.data.supplier_cost_usd,
+            fx_rate_usd_to_idr: providerResult.data.supplier_fx_rate,
+            customer_revenue_ngn_kobo: order.retail_amount_kobo,
+            metadata: { reconciled_from_supplier_order: true },
+          });
+          if (ledgerError) throw new Error("Supplier cost accounting reconciliation failed.");
+        }
+        const nextStatus = live.data.status === "COMPLETED" ? "completed" : live.data.status === "OTP_RECEIVED" ? "waiting_message" : "active";
+        await service.from("orders").update({
+          status: nextStatus, expires_at: live.data.expires_at ?? order.expires_at,
+          fulfilled_at: order.fulfilled_at ?? now, ...(nextStatus === "completed" ? { completed_at: now } : {}),
+          updated_at: now,
+        }).eq("id", order.id).eq("user_id", user.id);
+        await service.from("provider_orders").update({ status: live.data.status, last_provider_response: { status: live.data.status, expires_at: live.data.expires_at ?? null }, updated_at: now }).eq("id", providerResult.data.id);
+      }
+    } catch {
+      // Keep the safe current state; the next page poll or signed webhook retries reconciliation.
+    }
+    [numberResult, providerResult, messagesResult] = await Promise.all([
+      order.number_id ? service.from("numbers").select("e164_ciphertext,e164_last4").eq("id", order.number_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
+      service.from("provider_orders").select("id,provider_id,provider_order_ref,status,supplier_cost_usd,wholesale_amount_minor,wholesale_currency,supplier_fx_rate,supplier_product_id").eq("order_id", order.id).maybeSingle(),
+      service.from("messages").select("id,sender,body_ciphertext,received_at,status").eq("order_id", order.id).eq("user_id", user.id).order("received_at", { ascending: false }).limit(20),
+    ]);
+  }
   if (numberResult.error || providerResult.error || messagesResult.error) {
     return NextResponse.json({ error: "Could not load order details." }, { status: 500 });
   }
