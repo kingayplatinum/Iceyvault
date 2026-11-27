@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
         return new NextResponse("Secure message storage is not configured", { status: 503 });
       }
     }
-    await service.from("orders").update({ status: "waiting_message", updated_at: now }).eq("id", providerOrder.order_id).in("status", ["active","provisioning"]);
+    await service.from("orders").update({ status: "waiting_message", updated_at: now }).eq("id", providerOrder.order_id).in("status", ["active","provisioning","review_required"]);
     await service.from("provider_orders").update({
       status: "OTP_RECEIVED",
       last_provider_response: { event: event.event, sms_revision: revision, expires_at: event.data.expires_at ?? null },
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
 
   if (current.status === "COMPLETED") {
     await service.from("orders").update({ status: "completed", fulfilled_at: now, completed_at: now, updated_at: now })
-      .eq("id", providerOrder.order_id).in("status", ["active","waiting_message","provisioning"]);
+      .eq("id", providerOrder.order_id).in("status", ["active","waiting_message","provisioning","review_required"]);
     await service.from("provider_orders").update({ status: "COMPLETED", updated_at: now }).eq("id", providerOrder.id);
   } else if (current.status === "EXPIRED" || current.status === "CANCELED") {
     const { error } = await service.rpc("refund_failed_smscode_order", {
