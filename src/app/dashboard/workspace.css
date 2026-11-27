@@ -190,3 +190,19 @@
 .workspace-message-order small{font-size:10px;color:#7b8495}
 .workspace-message-order>a{display:inline-flex;align-items:center;gap:5px;color:var(--workspace-purple);font-size:11px;font-weight:750;text-decoration:none;white-space:nowrap}
 @media(max-width:760px){.workspace-message-summary{gap:10px;padding:13px}.workspace-message-side{gap:7px}.workspace-message-expanded{padding:0 13px 13px}.workspace-message-order{align-items:flex-start;flex-direction:column}}
+
+.social-kind-tabs{display:flex;gap:9px;margin:0 0 16px;flex-wrap:wrap}
+.social-kind-tabs button,.social-categories button{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid #e1e4ed;border-radius:10px;background:#fff;color:#626b7d;font-size:11px;font-weight:750}
+.social-kind-tabs button.selected,.social-categories button.selected{border-color:#9686e7;background:#f4f2ff;color:#5948b8}
+.social-categories{display:flex;gap:7px;flex-wrap:wrap;margin:-4px 0 16px}
+.social-categories button{padding:7px 11px;font-size:10px}
+.social-service-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.social-service-card{display:grid;gap:7px;text-align:left;padding:14px;border:1px solid #e6e9f1;border-radius:12px;background:#fff;color:#242938}
+.social-service-card>span{color:#7665d2}.social-service-card b{font-size:12px}.social-service-card small{font-size:10px;color:#7b8495}
+.social-service-card.selected{border-color:#8c7ae1;background:#f8f7ff;box-shadow:0 0 0 2px #8c7ae119}
+.social-spaced{margin-top:15px}.social-textarea{min-height:110px;resize:vertical}.social-spaced small{color:#7b8495;font-size:10px;font-weight:500}
+.social-dripfeed{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:15px}
+.social-checkout{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-top:20px;padding-top:17px;border-top:1px solid #edf0f5}
+.social-checkout>div{display:grid;gap:4px}.social-checkout small{color:#7b8495;font-size:10px}.social-checkout strong{font-size:23px;letter-spacing:-.5px}
+.social-order-actions{display:flex;gap:12px;margin-top:5px;flex-wrap:wrap}.social-order-actions button{display:inline-flex;align-items:center;gap:5px;border:0;background:none;padding:0;color:#6857c3;font-size:10px;font-weight:750}
+@media(max-width:760px){.social-service-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.social-dripfeed{grid-template-columns:1fr}.social-checkout{align-items:stretch;flex-direction:column}.social-checkout .workspace-primary{width:100%}}
