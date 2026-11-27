@@ -35,7 +35,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
   let fallbackMessage: { id:string; sender:string; content:string; received_at:string } | null = null;
   // Self-heal orders where SMSCode accepted the purchase but the original request
   // was interrupted before local accounting/status updates or the webhook arrived.
-  if (providerResult.data && order.number_id && ["review_required","active","waiting_message"].includes(order.status)) {
+  if (providerResult.data && order.number_id && ["review_required","active","waiting_message","expired"].includes(order.status)) {
     try {
       const live = await smscodeRequest<SupplierOrder>(`/orders/${encodeURIComponent(providerResult.data.provider_order_ref)}`);
       const now = new Date().toISOString();
