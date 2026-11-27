@@ -19,7 +19,14 @@ export default function OrderDetail({ id }: { id: string }) {
     if (!response.ok) { setNotice(json.error || "Could not load order."); return; }
     setDetail(json);
   }
-  useEffect(() => { void load(); }, [id]);
+  useEffect(() => {
+    void load();
+    const status = detail?.order.status;
+    if (status && !["completed","expired","canceled","refunded"].includes(status)) {
+      const timer = window.setInterval(() => { void load(); }, 7000);
+      return () => window.clearInterval(timer);
+    }
+  }, [id, detail?.order.status]);
   async function action(actionName: "cancel" | "finish" | "resend") {
     setBusy(true); setNotice("");
     try {
@@ -39,7 +46,7 @@ export default function OrderDetail({ id }: { id: string }) {
     <p style={{ color: "#737789", fontSize: 13 }}>Your number, expiry and verification messages.</p>
     {!order ? <p style={{ padding: 20 }}>{notice || "Loading order…"}</p> : <>
       <section style={card}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}><b>Order status</b><b>{order.status.replaceAll("_", " ")}</b></div>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}><b>Order status</b><b>{(order.status === "review_required" ? "Confirming supplier order" : order.status.replaceAll("_", " "))}</b></div>
         <p style={{ fontSize: 12, color: "#777" }}>Reference {order.id.slice(0, 8)} · {date(order.created_at)}</p>
         <h2 style={{ fontSize: 30, margin: "14px 0 5px" }}>{order.phoneNumber || "Number unavailable"}</h2>
         <p style={{ fontSize: 13, color: "#737789" }}>Purchase amount: {money(order.retail_amount_kobo)}</p>
@@ -50,7 +57,7 @@ export default function OrderDetail({ id }: { id: string }) {
         {detail?.messages.length ? detail.messages.map(message => <article key={message.id} style={{ padding: "13px 0", borderTop: "1px solid #eceef3" }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}><b>{message.sender || "SMS"}</b><small>{date(message.received_at)}</small></div>
           <pre style={{ whiteSpace: "pre-wrap", font: "inherit", background: "#f7f7fb", padding: 12, borderRadius: 9 }}>{message.content}</pre>
-        </article>) : <p style={{ color: "#737789", fontSize: 13 }}>No verification SMS has arrived yet. This page updates when the supplier sends a message.</p>}
+        </article>) : <p style={{ color: "#737789", fontSize: 13 }}>Waiting for SMSCode. This page checks for new messages automatically.</p>}
       </section>
       {["active", "waiting_message"].includes(order.status) ? <section style={{ ...card, display: "flex", gap: 10, flexWrap: "wrap" }}>
         <button disabled={busy || order.status !== "waiting_message"} onClick={() => void action("finish")} style={primary}>Finish order</button>
