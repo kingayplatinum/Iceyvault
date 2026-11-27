@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin/require-admin";
-import { decryptPrivateValue } from "@/lib/crypto-vault";
+import { decryptPrivateValue, encryptPrivateValue } from "@/lib/crypto-vault";
+import { smscodeRequest } from "@/lib/smscode/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +23,48 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
   ]);
   if (providerResult.error || numberResult.error || messagesResult.error || tierResult.error) {
     return NextResponse.json({ error: "Could not load complete order details." }, { status: 500 });
+  }
+
+  // Opening an admin order also reconciles it against SMSCode. This removes the
+  // old manual-review dependency when the supplier accepted but local writes/webhooks lagged.
+  if (providerResult.data && ["review_required","active","waiting_message"].includes(order.status)) {
+    try {
+      type LiveOrder = { status:string; otp_code?:string|null; otp_message?:string|null; sms_revision?:number; expires_at?:string|null };
+      const live = await smscodeRequest<LiveOrder>(`/orders/${encodeURIComponent(providerResult.data.provider_order_ref)}`);
+      const now = new Date().toISOString();
+      if (live.data.otp_code || live.data.otp_message) {
+        const revision = Math.max(0, Number(live.data.sms_revision) || 0);
+        const body = [live.data.otp_code ? "OTP: "+live.data.otp_code : "", live.data.otp_message || ""].filter(Boolean).join("\n");
+        const { error: messageError } = await auth.service.from("messages").insert({
+          order_id: id, user_id: order.user_id, provider_id: providerResult.data.provider_id,
+          provider_message_ref: providerResult.data.provider_order_ref+":"+revision,
+          sender: "SMSCode", body_ciphertext: encryptPrivateValue(body), received_at: now,
+          status: "received", retention_until: new Date(Date.now()+30*24*60*60*1000).toISOString(),
+        });
+        if (messageError && messageError.code !== "23505") throw new Error("Could not save supplier message.");
+      }
+      if (["ACTIVE","OTP_RECEIVED","COMPLETED","EXPIRED"].includes(live.data.status)) {
+        const { data: ledger } = await auth.service.from("supplier_cost_ledger").select("id").eq("order_id",id).maybeSingle();
+        if (!ledger && providerResult.data.wholesale_amount_minor != null && providerResult.data.wholesale_currency) {
+          const { error: ledgerError } = await auth.service.from("supplier_cost_ledger").insert({
+            order_id:id,provider_order_id:providerResult.data.id,supplier_code:"smscode",
+            supplier_product_id:providerResult.data.supplier_product_id,
+            supplier_currency:providerResult.data.wholesale_currency,
+            supplier_amount_minor:providerResult.data.wholesale_amount_minor,
+            supplier_amount_usd:providerResult.data.supplier_cost_usd,
+            fx_rate_usd_to_idr:providerResult.data.supplier_fx_rate,
+            customer_revenue_ngn_kobo:order.retail_amount_kobo,
+            metadata:{reconciled_from_admin_order_view:true},
+          });
+          if (ledgerError) throw new Error("Could not reconcile supplier cost ledger.");
+        }
+        const nextStatus=live.data.status==="COMPLETED"?"completed":live.data.status==="EXPIRED"?"expired":live.data.status==="OTP_RECEIVED"?"waiting_message":"active";
+        await auth.service.from("orders").update({status:nextStatus,expires_at:live.data.expires_at??order.expires_at,fulfilled_at:order.fulfilled_at??now,...(nextStatus==="completed"?{completed_at:now}:{}),updated_at:now}).eq("id",id);
+        await auth.service.from("provider_orders").update({status:live.data.status,last_provider_response:{status:live.data.status,expires_at:live.data.expires_at??null},updated_at:now}).eq("id",providerResult.data.id);
+      }
+    } catch {
+      // Keep the current state and allow the next automatic refresh or webhook to retry.
+    }
   }
 
   let phoneNumber: string | null = null;
