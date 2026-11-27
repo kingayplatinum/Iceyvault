@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
   ShieldCheck, LayoutDashboard, Users, ShoppingBag, CreditCard, Store,
-  Layers, RotateCcw, BarChart3, ScrollText, Settings, MoreHorizontal,
+  Layers, RotateCcw, BarChart3, ScrollText, Settings, MoreHorizontal, Activity,
 } from "lucide-react";
 import "./admin.css";
 
@@ -16,7 +16,7 @@ const nav = [
   ["Orders", "/admin/orders", ShoppingBag],
   ["Payments & wallet", "/admin/payments", CreditCard],
   ["Supplier connection", "/admin/suppliers", Store],
-  ["Catalogue & tiers", "/admin", Layers],
+  ["Catalogue & tiers", "/admin", Layers],\n  ["Social supplier", "/admin/sizzle", Activity],
   ["Refunds", "/admin/refunds", RotateCcw],
   ["Profit & loss", "/admin/analytics", BarChart3],
   ["Audit logs", "/admin/audit", ScrollText],
