@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin/require-admin";
 import { syncSizzleCatalogue } from "@/lib/sizzle/sync";
-import { sizzleRequest, SizzleError } from "@/lib/sizzle/client";
+import { SizzleError } from "@/lib/sizzle/client";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
