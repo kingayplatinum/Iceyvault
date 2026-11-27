@@ -32,6 +32,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
     service.from("messages").select("id,sender,body_ciphertext,received_at,status").eq("order_id", order.id).eq("user_id", user.id).order("received_at", { ascending: false }).limit(20),
   ]);
 
+  let fallbackMessage: { id:string; sender:string; content:string; received_at:string } | null = null;
   // Self-heal orders where SMSCode accepted the purchase but the original request
   // was interrupted before local accounting/status updates or the webhook arrived.
   if (providerResult.data && order.number_id && ["review_required","active","waiting_message"].includes(order.status)) {
@@ -50,7 +51,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
             sender: "SMSCode", body_ciphertext: encryptPrivateValue(body), received_at: now,
             status: "received", retention_until: new Date(Date.now()+30*24*60*60*1000).toISOString(),
           });
-          if (messageError && messageError.code !== "23505") messagePending = true;
+          if (messageError && messageError.code !== "23505") { messagePending = true; fallbackMessage = { id: "live-"+providerResult.data.provider_order_ref+"-"+revision, sender: "SMSCode", content: body, received_at: now }; }
         }
       }
 
@@ -105,6 +106,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
       content: decryptPrivateValue(message.body_ciphertext),
       received_at: message.received_at,
     }));
+    if (fallbackMessage && !messages.some((message) => message.content === fallbackMessage?.content)) messages.unshift(fallbackMessage);
   } catch {
     return NextResponse.json({ error: "Secure message data is temporarily unavailable. Contact support." }, { status: 503 });
   }
