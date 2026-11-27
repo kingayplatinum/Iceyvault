@@ -21,7 +21,7 @@ type D = {
 };
 type C = { services: Array<{ id: string; display_name: string }>; tiers: Array<{ id: string; service_id: string; tier_label: string; country_iso2: string; country_name?: string | null; retail_price_kobo: number; last_inventory_count: number | null }> };
 const pages: Record<string, { title: string; description: string }> = {
-  catalog: { title: "Browse services", description: "Choose a verified service and a live, available number." },
+  catalog: { title: "Virtual numbers", description: "Choose a country, app and number type to get a number for SMS verification." },
   orders: { title: "My orders", description: "Track your number activations and order history." },
   wallet: { title: "Wallet", description: "Manage your NGN balance, fund securely and review every transaction." },
   messages: { title: "SMS inbox", description: "Verification messages for your active number orders." },
