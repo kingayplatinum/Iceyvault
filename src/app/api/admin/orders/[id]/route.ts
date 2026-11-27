@@ -25,6 +25,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
     return NextResponse.json({ error: "Could not load complete order details." }, { status: 500 });
   }
 
+  let fallbackMessage: { id:string; sender:string; content:string; received_at:string } | null = null;
   // Opening an admin order also reconciles it against SMSCode. This removes the
   // old manual-review dependency when the supplier accepted but local writes/webhooks lagged.
   if (providerResult.data && ["review_required","active","waiting_message"].includes(order.status)) {
@@ -43,7 +44,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
           sender: "SMSCode", body_ciphertext: encryptPrivateValue(body), received_at: now,
           status: "received", retention_until: new Date(Date.now()+30*24*60*60*1000).toISOString(),
         });
-        if (messageError && messageError.code !== "23505") messagePending = true;
+        if (messageError && messageError.code !== "23505") { messagePending = true; fallbackMessage = { id:"live-"+providerResult.data.provider_order_ref+"-"+revision, sender:"SMSCode", content:body, received_at:now }; }
       }
       if (["ACTIVE","OTP_RECEIVED","COMPLETED","EXPIRED"].includes(live.data.status)) {
         const { data: ledger } = await auth.service.from("supplier_cost_ledger").select("id").eq("order_id",id).maybeSingle();
@@ -77,6 +78,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
       id: message.id, sender: message.sender,
       content: decryptPrivateValue(message.body_ciphertext), received_at: message.received_at,
     }));
+    if (fallbackMessage && !messages.some((message) => message.content === fallbackMessage?.content)) messages.unshift(fallbackMessage);
   } catch {
     return NextResponse.json({ error: "Secure order data could not be decrypted." }, { status: 503 });
   }
