@@ -111,7 +111,7 @@ begin
   select * into v_existing from public.sizzle_orders
     where user_id = p_user_id and idempotency_key = p_idempotency_key for update;
   if found then
-    if v_existing.service_id <> p_service_id or v_existing.quantity <> p_quantity then
+    if v_existing.service_id <> p_service_id or v_existing.quantity <> p_quantity or v_existing.target_link is distinct from nullif(p_target_link,'') or v_existing.destination_email is distinct from nullif(p_destination_email,'') or v_existing.comments is distinct from nullif(p_comments,'') then
       raise exception 'IDEMPOTENCY_KEY_REUSED';
     end if;
     select v_existing.id,v_existing.retail_amount_kobo,v_existing.external_service_id,
@@ -131,6 +131,10 @@ begin
   if v_service.product_kind = 'digital_account' and coalesce(p_destination_email,'') !~* '^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$' then raise exception 'DESTINATION_EMAIL_REQUIRED'; end if;
   if v_service.product_kind = 'social' and coalesce(p_target_link,'') !~* '^https?://' then raise exception 'TARGET_LINK_REQUIRED'; end if;
   if v_service.service_type = 'custom_comments' and coalesce(length(trim(p_comments)),0) = 0 then raise exception 'COMMENTS_REQUIRED'; end if;
+  if v_service.service_type = 'custom_comments' and (
+    select count(*) from regexp_split_to_table(coalesce(p_comments,''), E'\\r?\\n') as comment_line
+    where length(trim(comment_line)) > 0
+  ) <> p_quantity then raise exception 'COMMENT_QUANTITY_MISMATCH'; end if;
   if p_runs is not null and (not v_service.dripfeed_supported or p_runs < 1 or p_runs > 1000 or p_interval_minutes not in (0,5,10,15,30,60,90)) then raise exception 'INVALID_DRIPFEED'; end if;
 
   v_retail := greatest(1,ceil(v_service.retail_rate_per_1000_kobo::numeric * p_quantity / 1000)::bigint);
