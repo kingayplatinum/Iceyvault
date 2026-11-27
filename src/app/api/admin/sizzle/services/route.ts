@@ -4,8 +4,6 @@ import { sizzleRequest, SizzleError, SizzleService } from "@/lib/sizzle/client";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const slug = (value: string) => value.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"").slice(0,90);
-
 export async function GET() {
   const admin = await requireAdmin();
   if ("response" in admin) return admin.response;
@@ -16,7 +14,7 @@ export async function GET() {
   return NextResponse.json({ services: data ?? [] }, { headers: { "Cache-Control": "no-store" } });
 }
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   const admin = await requireAdmin();
   if ("response" in admin) return admin.response;
   try {
@@ -24,7 +22,7 @@ export async function POST(request: NextRequest) {
     if (!Array.isArray(remote)) return NextResponse.json({ error: "Sizzle returned an unexpected service catalogue." }, { status: 502 });
     const now = new Date().toISOString();
     const { data: existing, error: readError } = await admin.service.from("sizzle_services")
-      .select("external_service_id,product_kind,fulfilment_mode,retail_rate_per_1000_kobo,active")
+      .select("external_service_id,product_kind,fulfilment_mode,retail_rate_per_1000_kobo,refill_supported,active")
       .in("external_service_id", remote.map(s => String(s.service)));
     if (readError) throw readError;
     const previous = new Map((existing ?? []).map(row => [row.external_service_id, row]));
