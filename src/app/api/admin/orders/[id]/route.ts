@@ -79,7 +79,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
     return NextResponse.json({ error: "Secure order data could not be decrypted." }, { status: 503 });
   }
   return NextResponse.json({
-    order, provider: providerResult.data, number: numberResult.data ? { ...numberResult.data, phoneNumber } : null,
+    order, provider: providerResult.data, number: numberResult.data ? { e164_last4: numberResult.data.e164_last4, country_iso2: numberResult.data.country_iso2, service_code: numberResult.data.service_code, status: numberResult.data.status, phoneNumber } : null,
     tier: tierResult.data, messages,
   }, { headers: { "Cache-Control": "no-store" } });
 }
