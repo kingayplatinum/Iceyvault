@@ -167,3 +167,26 @@
 @media(max-width:640px){.workspace-catalogue-picker{grid-template-columns:1fr;gap:13px}.workspace-catalogue-picker>.workspace-field:nth-child(3){grid-column:1}.workspace-selected-product{max-width:none}}
 
 .workspace-brand img{display:block;width:148px;height:auto;object-fit:contain}.workspace-brand span{display:none}
+
+/* Expandable customer SMS inbox */
+.workspace-message-list{display:grid;gap:11px}
+.workspace-message-card{border:1px solid #e8eaf1;border-radius:13px;background:#fff;overflow:hidden}
+.workspace-message-card[open]{border-color:#d8d1fa;box-shadow:0 5px 18px #5e4ca20b}
+.workspace-message-summary{display:flex;align-items:center;gap:13px;padding:15px;cursor:pointer;list-style:none}
+.workspace-message-summary::-webkit-details-marker{display:none}
+.workspace-message-main{display:grid;gap:4px;min-width:0;flex:1}
+.workspace-message-main>b{font-size:12px;color:#252a36}
+.workspace-message-preview{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#454d5d;font-size:12px}
+.workspace-message-main>small{font-size:10px;color:#828b9b}
+.workspace-message-side{display:flex;align-items:center;gap:12px}
+.workspace-message-chevron{color:#7d6bcf;font-size:19px;line-height:1;transition:transform .18s}
+.workspace-message-card[open] .workspace-message-chevron{transform:rotate(180deg)}
+.workspace-message-expanded{padding:0 16px 16px 66px}
+.workspace-message-label{display:block;margin-bottom:7px;color:#7d8494;font-size:9px;font-weight:800;letter-spacing:1.1px}
+.workspace-message-body{margin:0;padding:13px 14px;border-radius:10px;background:#f7f6fc;color:#292d3a;font-size:13px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
+.workspace-message-order{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:13px;padding-top:13px;border-top:1px solid #edf0f5}
+.workspace-message-order>div{display:grid;gap:4px}
+.workspace-message-order b{font-size:11px;color:#292d3a}
+.workspace-message-order small{font-size:10px;color:#7b8495}
+.workspace-message-order>a{display:inline-flex;align-items:center;gap:5px;color:var(--workspace-purple);font-size:11px;font-weight:750;text-decoration:none;white-space:nowrap}
+@media(max-width:760px){.workspace-message-summary{gap:10px;padding:13px}.workspace-message-side{gap:7px}.workspace-message-expanded{padding:0 13px 13px}.workspace-message-order{align-items:flex-start;flex-direction:column}}
