@@ -6,6 +6,7 @@ const schema = z.object({
   fulfilment_mode: z.enum(["supplier_email","manual_review"]).optional(),
   retail_rate_per_1000_kobo: z.number().int().nonnegative().max(100000000000).optional(),
   active: z.boolean().optional(),
+  refill_supported: z.boolean().optional(),
 }).strict();
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin();
