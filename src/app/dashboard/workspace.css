@@ -249,3 +249,7 @@
  .workspace-mobile-nav a{font-size:9px}
 }
 @media(max-width:380px){.social-service-grid{grid-template-columns:1fr}.social-service-card{min-height:132px}}
+
+.dashboard-market-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+.dashboard-market-actions .dashboard-browse{margin-top:0}
+@media(max-width:760px){.dashboard-market-actions{display:grid;grid-template-columns:1fr}.dashboard-market-actions>a{width:100%}}
