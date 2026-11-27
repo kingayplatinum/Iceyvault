@@ -25,6 +25,21 @@ export async function POST(request: NextRequest) {
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return fail("Check the selected service, quantity and order details.");
   const service = createServiceClient();
+  // Re-check the live supplier rate and availability before reserving wallet funds.
+  try {
+    const liveServices = await sizzleRequest<Array<{ service: string; rate: string; min: string; max: string; type: string }>>({ action: "services" });
+    const { data: configured } = await service.from("sizzle_services")
+      .select("external_service_id,rate_per_1000_ngn,min_quantity,max_quantity,service_type,last_synced_at")
+      .eq("id", parsed.data.serviceId).maybeSingle();
+    const live = configured ? liveServices.find(item => String(item.service) === configured.external_service_id) : null;
+    if (!configured || !live || Number(live.rate) !== Number(configured.rate_per_1000_ngn) ||
+        Number(live.min) !== configured.min_quantity || Number(live.max) !== configured.max_quantity ||
+        live.type !== configured.service_type) {
+      return fail("The supplier service or price has changed. Please try again after the administrator refreshes the Sizzle catalogue.", 409);
+    }
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : "Could not verify live Sizzle pricing. No wallet funds were reserved.", 502);
+  }
   const { data: reservation, error: reserveError } = await service.rpc("reserve_sizzle_order", {
     p_user_id: user.id, p_service_id: parsed.data.serviceId,
     p_idempotency_key: parsed.data.idempotencyKey, p_quantity: parsed.data.quantity,
