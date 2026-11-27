@@ -60,6 +60,11 @@ export default function CustomerSection({ section }: { section: string }) {
 
   async function load() {
     try {
+      // Reconcile any recent pending Flutterwave deposits before reading the balance.
+      // This also covers bank transfers where the customer never returns from checkout.
+      if (section === "wallet") {
+        await fetch("/api/account/wallet/reconcile", { cache: "no-store" }).catch(() => null);
+      }
       const r = await fetch("/api/account/overview", { cache: "no-store" });
       if (r.ok) {
         const j = await r.json();
