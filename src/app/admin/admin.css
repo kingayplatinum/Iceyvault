@@ -293,3 +293,13 @@
 .admin-order-link>span{display:grid;gap:5px}
 .admin-order-link>span small{color:#7b8193;font-size:11px}
 .admin-order-link>strong{display:flex;align-items:center;gap:8px}
+
+.social-admin-list{display:grid;gap:12px}
+.social-admin-card{padding:16px;border:1px solid #e5e8f0;border-radius:13px;background:#fff}
+.social-admin-head,.social-admin-foot{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.social-admin-head>div{display:grid;gap:5px}.social-admin-head b{font-size:13px}.social-admin-head small,.social-admin-foot small{font-size:10px;color:#7b8495}
+.social-admin-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:15px 0}
+.social-admin-fields label{display:grid;gap:6px;font-size:10px;font-weight:750;color:#4b5364}
+.social-admin-fields input,.social-admin-fields select{width:100%;min-width:0;min-height:39px;padding:8px 10px;border:1px solid #dce1eb;border-radius:8px;background:#fff;color:#171923;font-size:11px}
+.social-admin-foot{padding-top:12px;border-top:1px solid #edf0f5}
+@media(max-width:760px){.social-admin-fields{grid-template-columns:1fr}.social-admin-foot{align-items:flex-start;flex-direction:column}}
