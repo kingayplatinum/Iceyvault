@@ -47,7 +47,6 @@ export async function POST(_request: NextRequest, context: { params: Promise<{ i
   const { data: order } = await service.from("sizzle_orders").select("id,provider_order_ref,refill_supported,status").eq("id",id).eq("user_id",user.id).maybeSingle();
   if (!order) return NextResponse.json({ error: "Order not found." }, { status: 404 });
   if (!order.refill_supported || !order.provider_order_ref) return NextResponse.json({ error: "Refill is not supported for this order." }, { status: 409 });
-  if (!["completed","partial"].includes((order.status||"").toLowerCase())) return NextResponse.json({ error: "Only completed or partially completed orders can be submitted for refill." }, { status: 409 });
   try {
     const result = await sizzleRequest<{ status?: string; refill?: string; message?: string }>({ action: "refill", order: order.provider_order_ref });
     if (result.status !== "success" || !result.refill) return NextResponse.json({ error: result.message || "Sizzle did not confirm the refill request." }, { status: 502 });
