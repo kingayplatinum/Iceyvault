@@ -140,12 +140,13 @@ export async function GET() {
   const auth = await createClient();
   const { data: { user } } = await auth.auth.getUser();
   if (!user) return fail("Sign in required.", 401);
-  const { data, error } = await auth.from("sizzle_orders")
+  const service = createServiceClient();
+  const { data, error } = await service.from("sizzle_orders")
     .select("id,product_kind,status,target_link,destination_email,quantity,retail_amount_kobo,provider_order_ref,created_at,refill_supported,remains,start_count,service_id")
     .eq("user_id", user.id).order("created_at", { ascending: false }).limit(50);
   if (error) return fail("Could not load social orders.", 500);
   const ids = [...new Set((data ?? []).map(x => x.service_id))];
-  const { data: services } = ids.length ? await auth.from("sizzle_services").select("id,name,category").in("id", ids) : { data: [] };
+  const { data: services } = ids.length ? await service.from("sizzle_services").select("id,name,category").in("id", ids) : { data: [] };
   const names = new Map((services ?? []).map(x => [x.id, x]));
   return NextResponse.json({ orders: (data ?? []).map(x => ({ ...x, service: names.get(x.service_id) ?? null })) }, { headers: { "Cache-Control": "no-store" } });
 }
