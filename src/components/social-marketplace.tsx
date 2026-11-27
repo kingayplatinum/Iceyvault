@@ -29,6 +29,7 @@ export default function SocialMarketplace(){
  }
  useEffect(()=>{void load();},[]);
  useEffect(()=>{const first=visible[0];if(!visible.some(s=>s.id===selected))setSelected(first?.id||"");},[kind,category,services]);
+ useEffect(()=>{if(current)setQuantity(String(current.min_quantity));},[selected]);
  async function buy(){
   if(!current)return;
   const qty=current.service_type==="custom_comments"?commentCount:Number(quantity);
