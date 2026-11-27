@@ -10,7 +10,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
   if ("response" in auth) return auth.response;
   const { id } = await context.params;
   const { data: order, error } = await auth.service.from("orders")
-    .select("id,user_id,status,retail_amount_kobo,currency,created_at,updated_at,fulfilled_at,expires_at,number_id,offer_kind")
+    .select("id,user_id,status,retail_amount_kobo,currency,created_at,updated_at,fulfilled_at,expires_at,number_id,offer_kind,smscode_tier_id")
     .eq("id", id).maybeSingle();
   if (error || !order) return NextResponse.json({ error: "Order not found." }, { status: 404 });
 
