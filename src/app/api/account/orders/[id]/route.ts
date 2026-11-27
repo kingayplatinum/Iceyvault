@@ -38,7 +38,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
     try {
       const live = await smscodeRequest<SupplierOrder>(`/orders/${encodeURIComponent(providerResult.data.provider_order_ref)}`);
       const now = new Date().toISOString();
-      if (live.data.status === "OTP_RECEIVED" && (live.data.otp_code || live.data.otp_message)) {
+      if (live.data.otp_code || live.data.otp_message) {
         const revision = Math.max(0, Number(live.data.sms_revision) || 0);
         const body = [live.data.otp_code ? "OTP: " + live.data.otp_code : "", live.data.otp_message || ""].filter(Boolean).join("\n");
         if (body) {
@@ -52,7 +52,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
         }
       }
 
-      if (["ACTIVE","OTP_RECEIVED","COMPLETED"].includes(live.data.status)) {
+      if (["ACTIVE","OTP_RECEIVED","COMPLETED","EXPIRED"].includes(live.data.status)) {
         // A supplier purchase is already confirmed. Rebuild its missing cost ledger
         // from the durable provider order record; do not charge the customer again.
         const { data: ledger } = await service.from("supplier_cost_ledger").select("id").eq("order_id", order.id).maybeSingle();
@@ -69,7 +69,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
           });
           if (ledgerError) throw new Error("Supplier cost accounting reconciliation failed.");
         }
-        const nextStatus = live.data.status === "COMPLETED" ? "completed" : live.data.status === "OTP_RECEIVED" ? "waiting_message" : "active";
+        const nextStatus = live.data.status === "COMPLETED" ? "completed" : live.data.status === "EXPIRED" ? "expired" : live.data.status === "OTP_RECEIVED" ? "waiting_message" : "active";
         await service.from("orders").update({
           status: nextStatus, expires_at: live.data.expires_at ?? order.expires_at,
           fulfilled_at: order.fulfilled_at ?? now, ...(nextStatus === "completed" ? { completed_at: now } : {}),
