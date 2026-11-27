@@ -38,6 +38,8 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
     try {
       const live = await smscodeRequest<SupplierOrder>(`/orders/${encodeURIComponent(providerResult.data.provider_order_ref)}`);
       const now = new Date().toISOString();
+      let messagePending = false;
+      let ledgerPending = false;
       if (live.data.otp_code || live.data.otp_message) {
         const revision = Math.max(0, Number(live.data.sms_revision) || 0);
         const body = [live.data.otp_code ? "OTP: " + live.data.otp_code : "", live.data.otp_message || ""].filter(Boolean).join("\n");
@@ -48,7 +50,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
             sender: "SMSCode", body_ciphertext: encryptPrivateValue(body), received_at: now,
             status: "received", retention_until: new Date(Date.now()+30*24*60*60*1000).toISOString(),
           });
-          if (messageError && messageError.code !== "23505") throw new Error("Could not persist supplier OTP.");
+          if (messageError && messageError.code !== "23505") messagePending = true;
         }
       }
 
@@ -67,7 +69,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
             customer_revenue_ngn_kobo: order.retail_amount_kobo,
             metadata: { reconciled_from_supplier_order: true },
           });
-          if (ledgerError) throw new Error("Supplier cost accounting reconciliation failed.");
+          if (ledgerError) ledgerPending = true;
         }
         const nextStatus = live.data.status === "COMPLETED" ? "completed" : live.data.status === "EXPIRED" ? "expired" : live.data.status === "OTP_RECEIVED" ? "waiting_message" : "active";
         await service.from("orders").update({
@@ -75,7 +77,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
           fulfilled_at: order.fulfilled_at ?? now, ...(nextStatus === "completed" ? { completed_at: now } : {}),
           updated_at: now,
         }).eq("id", order.id).eq("user_id", user.id);
-        await service.from("provider_orders").update({ status: live.data.status, last_provider_response: { status: live.data.status, expires_at: live.data.expires_at ?? null }, updated_at: now }).eq("id", providerResult.data.id);
+        await service.from("provider_orders").update({ status: live.data.status, last_provider_response: { status: live.data.status, expires_at: live.data.expires_at ?? null, accounting_reconciliation_required: ledgerPending, message_reconciliation_required: messagePending }, updated_at: now }).eq("id", providerResult.data.id);
       }
     } catch {
       // Keep the safe current state; the next page poll or signed webhook retries reconciliation.
