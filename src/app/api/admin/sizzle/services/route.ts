@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
         service_type: s.type || "default", rate_per_1000_ngn: Number(s.rate),
         min_quantity: Math.max(1, Number(s.min) || 1), max_quantity: Math.max(1, Number(s.max) || 1),
         description: s.desc || null, dripfeed_supported: s.dripfeed === "1",
-        refill_supported: s.refill === "1", product_kind: kind,
+        refill_supported: typeof s.refill === "string" ? s.refill === "1" : old?.refill_supported ?? false, product_kind: kind,
         fulfilment_mode: old?.fulfilment_mode || "supplier_email",
         retail_rate_per_1000_kobo: old?.retail_rate_per_1000_kobo ?? 0,
         active: old?.active ?? false, last_synced_at: now, updated_at: now,
