@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
     user_id: user.id,
     wallet_id: wallet.id,
     gateway: "flutterwave",
+    purpose: "wallet_funding",
     gateway_reference: reference,
     amount_kobo: parsed.data.amountKobo,
     currency: "NGN",
