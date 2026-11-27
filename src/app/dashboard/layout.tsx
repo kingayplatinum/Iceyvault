@@ -4,13 +4,13 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
-  LayoutDashboard, ShoppingBag, Wallet, MessageCircle, Bell, LifeBuoy, Settings, LogOut, MoreHorizontal, Users,
+  LayoutDashboard, ShoppingBag, Wallet, MessageCircle, Bell, LifeBuoy, Settings, LogOut, MoreHorizontal, Users, Phone,
 } from "lucide-react";
 import "./workspace.css";
 
 const nav = [
   ["Overview", "/dashboard", LayoutDashboard],
-  ["Browse services", "/dashboard/catalog", ShoppingBag],
+  ["Virtual numbers", "/dashboard/catalog", Phone],
   ["Social media", "/dashboard/social", Users],
   ["My orders", "/dashboard/orders", ShoppingBag],
   ["Wallet", "/dashboard/wallet", Wallet],
@@ -68,7 +68,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
       <nav className="workspace-mobile-nav" aria-label="Mobile navigation">
         {mobilePrimary.map(([label, href, Icon]) => (
-          <Link href={href} key={href}><Icon size={19}/><span>{label === "Overview" ? "Home" : label === "Browse services" ? "Services" : label === "My orders" ? "Orders" : label}</span></Link>
+          <Link href={href} key={href}><Icon size={19}/><span>{label === "Overview" ? "Home" : label === "Virtual numbers" ? "Numbers" : label === "My orders" ? "Orders" : label}</span></Link>
         ))}
       </nav>
     </div>
