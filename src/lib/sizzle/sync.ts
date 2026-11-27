@@ -4,7 +4,7 @@ import { sizzleRequest, SizzleService } from "@/lib/sizzle/client";
 const MARKUP_MULTIPLIER = 1.5;
 
 function inferProductKind(service: SizzleService): "social" | "digital_account" {
-  const text = [service.name, service.category, service.desc].filter(Boolean).join(" ").toLowerCase();
+  const text = [service.name, service.category, service.desc, service.type].filter(Boolean).join(" ").toLowerCase();
   return /\b(account|accounts|gmail|outlook|yahoo mail|email account|aged profile|verified profile|aged account|social profile)\b/.test(text)
     ? "digital_account"
     : "social";
