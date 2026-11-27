@@ -26,7 +26,6 @@ export async function syncSizzleCatalogue() {
     const rate = Number(s.rate);
     const retailKobo = Math.ceil(rate * MARKUP_MULTIPLIER * 100);
     const kind = inferProductKind(s);
-    const old = null;
     return {
       external_service_id: String(s.service),
       name: String(s.name || "Unnamed Sizzle service"),
