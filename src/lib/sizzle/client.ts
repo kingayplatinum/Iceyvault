@@ -27,9 +27,10 @@ export async function sizzleRequest<T>(params: Record<string, string | number>):
     const message = typeof payload === "string" ? payload : (payload as SizzleEnvelope)?.error || (payload as SizzleEnvelope)?.message;
     throw new SizzleError(message || "Sizzle Social request failed.", response.status, "HTTP_ERROR");
   }
+  if (typeof payload === "string" && payload.trim()) throw new SizzleError(payload.trim(), 422, "SUPPLIER_REJECTED");
   if (payload && typeof payload === "object" && !Array.isArray(payload)) {
     const p = payload as SizzleEnvelope;
-    if (p.status === "error" || p.error) throw new SizzleError(p.error || p.message || "Sizzle Social rejected the request.", 502, "SUPPLIER_ERROR");
+    if (p.status === "error" || p.error) throw new SizzleError(p.error || p.message || "Sizzle Social rejected the request.", 422, "SUPPLIER_REJECTED");
   }
   return payload as T;
 }
