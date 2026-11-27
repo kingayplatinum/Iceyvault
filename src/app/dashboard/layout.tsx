@@ -4,13 +4,13 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
-  LayoutDashboard, ShoppingBag, Wallet, MessageCircle, Bell, LifeBuoy, Settings, LogOut, MoreHorizontal,
+  LayoutDashboard, ShoppingBag, Wallet, MessageCircle, Bell, LifeBuoy, Settings, LogOut, MoreHorizontal, Users,
 } from "lucide-react";
 import "./workspace.css";
 
 const nav = [
   ["Overview", "/dashboard", LayoutDashboard],
-  ["Browse services", "/dashboard/catalog", ShoppingBag],
+  ["Browse services", "/dashboard/catalog", ShoppingBag],\n  ["Social media", "/dashboard/social", Users],
   ["My orders", "/dashboard/orders", ShoppingBag],
   ["Wallet", "/dashboard/wallet", Wallet],
   ["SMS inbox", "/dashboard/messages", MessageCircle],
