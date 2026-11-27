@@ -1,0 +1,152 @@
+begin;
+
+-- Privileged Sizzle tables remain inaccessible to browser roles. The app server
+-- uses the service-role client after authenticating the customer.
+grant all on public.sizzle_services to service_role;
+grant all on public.sizzle_orders to service_role;
+grant all on public.sizzle_cost_ledger to service_role;
+revoke all on public.sizzle_services from public, anon, authenticated;
+revoke all on public.sizzle_orders from public, anon, authenticated;
+revoke all on public.sizzle_cost_ledger from public, anon, authenticated;
+
+-- Service-role RPCs only. Also require an actual service-role database session.
+create or replace function public.reserve_sizzle_order(
+  p_user_id uuid,
+  p_service_id uuid,
+  p_idempotency_key text,
+  p_quantity integer,
+  p_target_link text,
+  p_destination_email text,
+  p_comments text default null,
+  p_runs integer default null,
+  p_interval_minutes integer default null
+) returns table(
+  order_id uuid,
+  retail_amount_kobo bigint,
+  external_service_id text,
+  product_kind text,
+  service_type text,
+  rate_per_1000_ngn numeric,
+  estimated_supplier_cost_ngn numeric,
+  refill_supported boolean,
+  is_new boolean
+)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_service public.sizzle_services%rowtype;
+  v_existing public.sizzle_orders%rowtype;
+  v_retail bigint;
+  v_estimated numeric(16,4);
+begin
+  if current_user <> 'service_role'
+    or current_setting('request.jwt.claim.role', true) is distinct from 'service_role' then
+    raise exception 'Not authorized' using errcode = '42501';
+  end if;
+  if p_user_id is null then raise exception 'INVALID_USER'; end if;
+  if p_idempotency_key is null or length(p_idempotency_key) < 16 or length(p_idempotency_key) > 128 then
+    raise exception 'INVALID_IDEMPOTENCY_KEY';
+  end if;
+  if p_quantity is null or p_quantity < 1 then raise exception 'INVALID_QUANTITY'; end if;
+
+  select * into v_existing from public.sizzle_orders
+    where user_id = p_user_id and idempotency_key = p_idempotency_key for update;
+  if found then
+    if v_existing.service_id <> p_service_id or v_existing.quantity <> p_quantity
+      or v_existing.target_link is distinct from nullif(p_target_link,'')
+      or v_existing.destination_email is distinct from nullif(p_destination_email,'')
+      or v_existing.comments is distinct from nullif(p_comments,'')
+      or v_existing.runs is distinct from p_runs
+      or v_existing.interval_minutes is distinct from p_interval_minutes then
+      raise exception 'IDEMPOTENCY_KEY_REUSED';
+    end if;
+    select v_existing.id,v_existing.retail_amount_kobo,v_existing.external_service_id,
+      v_existing.product_kind,s.service_type,v_existing.supplier_rate_per_1000_ngn,
+      v_existing.estimated_supplier_cost_ngn,v_existing.refill_supported,false
+    into order_id,retail_amount_kobo,external_service_id,product_kind,service_type,
+      rate_per_1000_ngn,estimated_supplier_cost_ngn,refill_supported,is_new
+    from public.sizzle_services s where s.id = v_existing.service_id;
+    return next; return;
+  end if;
+
+  select * into v_service from public.sizzle_services where id = p_service_id for update;
+  if not found or not v_service.active then raise exception 'SERVICE_NOT_AVAILABLE'; end if;
+  if v_service.last_synced_at is null or v_service.last_synced_at < now() - interval '24 hours' then raise exception 'SERVICE_CATALOGUE_STALE'; end if;
+  if p_quantity < v_service.min_quantity or p_quantity > v_service.max_quantity then raise exception 'QUANTITY_OUT_OF_RANGE'; end if;
+  if v_service.retail_rate_per_1000_kobo <= 0 then raise exception 'SERVICE_NOT_PRICED'; end if;
+  if v_service.product_kind = 'digital_account' and coalesce(p_destination_email,'') !~* '^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$' then raise exception 'DESTINATION_EMAIL_REQUIRED'; end if;
+  if v_service.product_kind = 'social' and coalesce(p_target_link,'') !~* '^https?://' then raise exception 'TARGET_LINK_REQUIRED'; end if;
+  if v_service.service_type = 'custom_comments' and coalesce(length(trim(p_comments)),0) = 0 then raise exception 'COMMENTS_REQUIRED'; end if;
+  if v_service.service_type = 'custom_comments' and (
+    select count(*) from regexp_split_to_table(coalesce(p_comments,''), E'\\r?\\n') as comment_line
+    where length(trim(comment_line)) > 0
+  ) <> p_quantity then raise exception 'COMMENT_QUANTITY_MISMATCH'; end if;
+  if p_runs is not null and (not v_service.dripfeed_supported or p_runs < 1 or p_runs > 1000 or p_interval_minutes is null or p_interval_minutes not in (0,5,10,15,30,60,90)) then raise exception 'INVALID_DRIPFEED'; end if;
+
+  v_retail := greatest(1,ceil(v_service.retail_rate_per_1000_kobo::numeric * p_quantity / 1000)::bigint);
+  v_estimated := v_service.rate_per_1000_ngn * p_quantity / 1000;
+
+  insert into public.sizzle_orders(
+    user_id,service_id,external_service_id,product_kind,status,target_link,destination_email,
+    comments,quantity,runs,interval_minutes,retail_amount_kobo,supplier_rate_per_1000_ngn,
+    estimated_supplier_cost_ngn,refill_supported,idempotency_key
+  ) values (
+    p_user_id,p_service_id,v_service.external_service_id,v_service.product_kind,'provisioning',
+    nullif(p_target_link,''),nullif(p_destination_email,''),nullif(p_comments,''),p_quantity,
+    p_runs,p_interval_minutes,v_retail,v_service.rate_per_1000_ngn,v_estimated,
+    v_service.refill_supported,p_idempotency_key
+  ) returning id into order_id;
+
+  perform public.wallet_debit(
+    p_user_id,v_retail,'sizzle-order:' || order_id::text,'purchase',
+    case when v_service.product_kind='digital_account' then 'Sizzle digital account purchase' else 'Sizzle social media service' end,
+    jsonb_build_object('sizzle_order_id',order_id,'service_id',v_service.id,'external_service_id',v_service.external_service_id)
+  );
+
+  retail_amount_kobo := v_retail;
+  external_service_id := v_service.external_service_id;
+  product_kind := v_service.product_kind;
+  service_type := v_service.service_type;
+  rate_per_1000_ngn := v_service.rate_per_1000_ngn;
+  estimated_supplier_cost_ngn := v_estimated;
+  refill_supported := v_service.refill_supported;
+  is_new := true;
+  return next;
+end;
+$$;
+
+create or replace function public.refund_failed_sizzle_order(p_order_id uuid,p_reason text)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_order public.sizzle_orders%rowtype;
+begin
+  if current_user <> 'service_role'
+    or current_setting('request.jwt.claim.role', true) is distinct from 'service_role' then
+    raise exception 'Not authorized' using errcode = '42501';
+  end if;
+  select * into v_order from public.sizzle_orders where id=p_order_id for update;
+  if not found then raise exception 'ORDER_NOT_FOUND'; end if;
+  if v_order.status='refunded' then return false; end if;
+  if v_order.status not in ('provisioning','failed','error','rejected') then raise exception 'ORDER_NOT_REFUNDABLE'; end if;
+  perform public.wallet_credit(
+    v_order.user_id,v_order.retail_amount_kobo,'sizzle-refund:' || v_order.id::text,
+    'refund','Refund for unsuccessful Sizzle Social order',
+    jsonb_build_object('sizzle_order_id',v_order.id,'reason',left(coalesce(p_reason,'Supplier fulfilment failed'),500))
+  );
+  update public.sizzle_orders set status='refunded',updated_at=now() where id=v_order.id;
+  return true;
+end;
+$$;
+
+revoke all on function public.reserve_sizzle_order(uuid,uuid,text,integer,text,text,text,integer,integer) from public,anon,authenticated;
+revoke all on function public.refund_failed_sizzle_order(uuid,text) from public,anon,authenticated;
+grant execute on function public.reserve_sizzle_order(uuid,uuid,text,integer,text,text,text,integer,integer) to service_role;
+grant execute on function public.refund_failed_sizzle_order(uuid,text) to service_role;
+
+commit;
