@@ -206,3 +206,46 @@
 .social-checkout>div{display:grid;gap:4px}.social-checkout small{color:#7b8495;font-size:10px}.social-checkout strong{font-size:23px;letter-spacing:-.5px}
 .social-order-actions{display:flex;gap:12px;margin-top:5px;flex-wrap:wrap}.social-order-actions button{display:inline-flex;align-items:center;gap:5px;border:0;background:none;padding:0;color:#6857c3;font-size:10px;font-weight:750}
 @media(max-width:760px){.social-service-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.social-dripfeed{grid-template-columns:1fr}.social-checkout{align-items:stretch;flex-direction:column}.social-checkout .workspace-primary{width:100%}}
+
+
+/* Customer catalogue: clear platform groups, search and readable product cards */
+.workspace-sidebar nav a[href="/dashboard/catalog"],
+.workspace-sidebar nav a[href="/dashboard/social"]{color:#e3ddff;background:#ffffff08}
+.social-catalogue-panel{padding:25px}
+.social-search{display:flex;align-items:center;gap:10px;min-height:47px;padding:0 14px;border:1px solid #e0e3ec;border-radius:12px;background:#fafbfe;color:#8a91a1}
+.social-search:focus-within{border-color:#9382e5;box-shadow:0 0 0 3px #8d7be31a;background:#fff}
+.social-search input{width:100%;min-width:0;border:0;outline:0;background:transparent;color:#202536;font-size:13px}
+.social-search input::placeholder{color:#9aa1af}
+.social-search>button{border:0;background:transparent;color:#777f90;font-size:22px;line-height:1}
+.social-platform-groups{display:flex;gap:8px;overflow-x:auto;padding:14px 0 17px;scrollbar-width:thin}
+.social-platform-groups button{display:inline-flex;align-items:center;gap:8px;flex:0 0 auto;min-height:39px;padding:8px 11px;border:1px solid #e5e7ef;border-radius:10px;background:#fff;color:#626b7d;font-size:11px;font-weight:700;white-space:nowrap}
+.social-platform-groups button svg{color:#7968d3}
+.social-platform-groups button small{display:grid;place-items:center;min-width:19px;height:19px;padding:0 5px;border-radius:20px;background:#f1effb;color:#6d5bd0;font-size:9px}
+.social-platform-groups button.selected{border-color:#9686e7;background:#f4f2ff;color:#5948b8}
+.social-service-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.social-service-card{position:relative;min-height:164px;align-content:start;gap:8px;padding:16px;text-align:left;transition:border-color .16s,box-shadow .16s,transform .16s}
+.social-service-card:hover{border-color:#b8adef;transform:translateY(-2px);box-shadow:0 7px 20px #4e43820d}
+.social-service-icon{width:36px;height:36px;display:grid;place-items:center;border-radius:11px;background:#f1efff;color:#6d5bd0}
+.social-service-platform{position:absolute;top:20px;left:61px;color:#7d6bcf;font-size:9px;font-weight:800;letter-spacing:.04em}
+.social-service-card b{display:-webkit-box;overflow:hidden;-webkit-line-clamp:2;-webkit-box-orient:vertical;min-height:34px;font-size:12px;line-height:1.45}
+.social-service-card>small{color:#858da0;font-size:10px}
+.social-service-card>strong{margin-top:3px;color:#282d3a;font-size:14px}
+.social-service-card>strong small{color:#858da0;font-size:9px;font-weight:500}
+.social-service-card.selected{border-color:#8c7ae1;background:#faf9ff;box-shadow:0 0 0 2px #8c7ae119}
+.social-order-panel{scroll-margin-top:20px}
+.social-order-panel .workspace-section-title{align-items:flex-start}
+.social-order-panel .workspace-section-title h2{margin-top:7px}
+.social-order-panel .workspace-secure{flex-shrink:0}
+@media(max-width:980px){.social-service-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){
+ .social-catalogue-panel{padding:17px}
+ .social-platform-groups{margin-right:-3px;padding-bottom:12px}
+ .social-service-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .social-service-card{min-height:154px;padding:12px}
+ .social-service-platform{top:16px;left:54px;font-size:8px}
+ .social-service-icon{width:32px;height:32px}
+ .social-service-card b{font-size:11px}
+ .social-service-card>strong{font-size:13px}
+ .workspace-mobile-nav a{font-size:9px}
+}
+@media(max-width:380px){.social-service-grid{grid-template-columns:1fr}.social-service-card{min-height:132px}}
