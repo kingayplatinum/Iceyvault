@@ -10,7 +10,8 @@ import "./workspace.css";
 
 const nav = [
   ["Overview", "/dashboard", LayoutDashboard],
-  ["Browse services", "/dashboard/catalog", ShoppingBag],\n  ["Social media", "/dashboard/social", Users],
+  ["Browse services", "/dashboard/catalog", ShoppingBag],
+  ["Social media", "/dashboard/social", Users],
   ["My orders", "/dashboard/orders", ShoppingBag],
   ["Wallet", "/dashboard/wallet", Wallet],
   ["SMS inbox", "/dashboard/messages", MessageCircle],
