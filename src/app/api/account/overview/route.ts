@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { z } from "zod";
+import { decryptPrivateValue } from "@/lib/crypto-vault";
 
 export const dynamic = "force-dynamic";
 
@@ -14,21 +15,55 @@ export async function GET() {
     auth.from("profiles").select("display_name,phone_e164,country_code,billing_address_line1,billing_city,billing_state,billing_postal_code,billing_country").eq("id", user.id).maybeSingle(),
     auth.from("wallets").select("balance_kobo,currency").eq("user_id", user.id).maybeSingle(),
     auth.from("orders").select("id,offer_kind,status,retail_amount_kobo,currency,created_at,expires_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(20),
-    auth.from("messages").select("id,order_id,sender,received_at,status").eq("user_id", user.id).order("received_at", { ascending: false }).limit(30),
+    auth.from("messages").select("id,order_id,sender,body_ciphertext,received_at,status").eq("user_id", user.id).order("received_at", { ascending: false }).limit(30),
     auth.from("notifications").select("id,title,body,category,read_at,created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(30),
     auth.from("wallet_transactions").select("id,direction,amount_kobo,transaction_type,description,created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(30),
   ]);
 
   if (profile.error) return NextResponse.json({ error: "Could not load your profile." }, { status: 500 });
+  if (messages.error) return NextResponse.json({ error: "Could not load your verification messages." }, { status: 500 });
+
+  // Message bodies are encrypted at rest. Decrypt only after the authenticated
+  // user's RLS-scoped message query has completed; never return ciphertext.
+  const messageRows = messages.data ?? [];
+  const messageOrderIds = Array.from(new Set(messageRows.map((message) => message.order_id).filter(Boolean)));
+  const messageOrders = messageOrderIds.length
+    ? await auth.from("orders")
+        .select("id,status,retail_amount_kobo,created_at")
+        .eq("user_id", user.id)
+        .in("id", messageOrderIds)
+    : { data: [], error: null };
+  if (messageOrders.error) return NextResponse.json({ error: "Could not load verification order details." }, { status: 500 });
+
+  let inboxMessages: Array<{
+    id: string; order_id: string; sender: string | null; content: string;
+    received_at: string; status: string;
+    order: { id: string; status: string; retail_amount_kobo: number; created_at: string } | null;
+  }>;
+  try {
+    const orderById = new Map((messageOrders.data ?? []).map((order) => [order.id, order]));
+    inboxMessages = messageRows.map((message) => ({
+      id: message.id,
+      order_id: message.order_id,
+      sender: message.sender,
+      content: decryptPrivateValue(message.body_ciphertext),
+      received_at: message.received_at,
+      status: message.status,
+      order: orderById.get(message.order_id) ?? null,
+    }));
+  } catch {
+    return NextResponse.json({ error: "Secure message data is temporarily unavailable. Please try again." }, { status: 503 });
+  }
+
   return NextResponse.json({
     profile: profile.data,
     wallet: wallet.data,
     orders: orders.data ?? [],
-    messages: messages.data ?? [],
+    messages: inboxMessages,
     notifications: notifications.data ?? [],
     transactions: transactions.data ?? [],
     email: user.email,
-  });
+  }, { headers: { "Cache-Control": "no-store" } });
 }
 
 function normalizeNigeriaPhone(value?: string | null) {
