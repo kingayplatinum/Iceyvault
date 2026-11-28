@@ -1,12 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
   ArrowDownToLine, ArrowRight, ArrowUpRight, BadgeCheck, Check, ChevronDown,
   CircleHelp, Globe2, Headphones, LockKeyhole, Menu, MessageCircle, Search,
-  ShieldCheck, Smartphone, Sparkles, Wallet, X, Zap,
+  ShieldCheck, Smartphone, Sparkles, Wallet, X, Zap, Sun, Moon, Clock3, RefreshCw, BellRing, CircleDollarSign, ChevronUp,
 } from "lucide-react";
 
 type Category = "All services" | "WhatsApp" | "Telegram" | "Other services" | "Rentals";
@@ -21,7 +21,7 @@ export default function Home() {
   const [country, setCountry] = useState("All countries");
   const [query, setQuery] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
+  const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);\n  const [theme, setTheme] = useState<"dark" | "light">("dark");\n  const [openFaq, setOpenFaq] = useState<number | null>(0);\n\n  useEffect(() => {\n    const saved = window.localStorage.getItem("iceyvault-theme");\n    const preferred = saved === "light" || saved === "dark" ? saved : (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");\n    setTheme(preferred);\n    document.documentElement.dataset.theme = preferred;\n  }, []);\n\n  function toggleTheme() {\n    const next = theme === "dark" ? "light" : "dark";\n    setTheme(next);\n    document.documentElement.dataset.theme = next;\n    window.localStorage.setItem("iceyvault-theme", next);\n  }
   const filtered = useMemo(() => offers.filter((offer) => {
     const categoryMatch = category === "All services" || offer.category === category;
     const countryMatch = country === "All countries" || offer.country === country;
@@ -37,15 +37,15 @@ export default function Home() {
           <Link className="brand" href="/" aria-label="IceyVault home"><Image src="/iceyvault-logo.webp" alt="IceyVault" width={240} height={65} priority /></Link>
           <nav className={mobileOpen ? "main-nav mobile-visible" : "main-nav"}>
             <a href="#services" onClick={() => setMobileOpen(false)}>Explore services</a>
-            <a href="#how" onClick={() => setMobileOpen(false)}>How it works</a>
+            <a href="#features" onClick={() => setMobileOpen(false)}>Features</a>\n            <a href="#how" onClick={() => setMobileOpen(false)}>How it works</a>
             <a href="#trust" onClick={() => setMobileOpen(false)}>Why IceyVault</a>
-            <a href="#help" onClick={() => setMobileOpen(false)}>Help</a>
+            <a href="#faq" onClick={() => setMobileOpen(false)}>FAQs</a>
           </nav>
           <div className="nav-actions">
             <Link className="login-link" href="/account">Log in</Link>
             <Link className="button button-small" href="/account">Create account <ArrowRight size={15} /></Link>
           </div>
-          <button className="mobile-menu" aria-label="Toggle navigation" onClick={() => setMobileOpen(!mobileOpen)}>{mobileOpen ? <X /> : <Menu />}</button>
+          <button className="theme-toggle" type="button" onClick={toggleTheme} aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"} title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>{theme === "dark" ? <Sun /> : <Moon />}</button>\n          <button className="mobile-menu" aria-label="Toggle navigation" onClick={() => setMobileOpen(!mobileOpen)}>{mobileOpen ? <X /> : <Menu />}</button>
         </div>
       </header>
 
@@ -115,7 +115,40 @@ export default function Home() {
         </section>
       </div>}
 
-      <section className="steps-section" id="how"><div className="section-wrap"><div className="center-heading"><div className="eyebrow"><span className="eyebrow-line" /> HOW IT WORKS</div><h2>Everything in three simple steps.</h2><p>A straightforward experience from choosing a service to managing your activity.</p></div>
+
+      <section className="features-section" id="features">
+        <div className="section-wrap">
+          <div className="section-heading"><div><div className="eyebrow"><span className="eyebrow-line" /> YOUR WORKSPACE</div><h2>More than a number.<br className="mobile-break" /> A complete control centre.</h2><p>Everything you need to follow a service from selection through delivery, with the important details kept visible.</p></div></div>
+          <div className="features-grid">
+            <article className="feature-card"><span className="feature-icon"><Globe2 size={21}/></span><div><h3>Multi-country discovery</h3><p>Explore supported services by country and platform, with availability confirmed before you buy.</p></div><span className="feature-index">01</span></article>
+            <article className="feature-card"><span className="feature-icon"><Wallet size={21}/></span><div><h3>One NGN wallet</h3><p>Keep track of deposits, purchases, refunds and your available balance from one place.</p></div><span className="feature-index">02</span></article>
+            <article className="feature-card"><span className="feature-icon"><Clock3 size={21}/></span><div><h3>Order status timeline</h3><p>Follow order progress and see when a request is waiting, processing, completed or needs attention.</p></div><span className="feature-index">03</span></article>
+            <article className="feature-card"><span className="feature-icon"><MessageCircle size={21}/></span><div><h3>Message visibility</h3><p>View supported incoming verification messages in the relevant order instead of chasing updates.</p></div><span className="feature-index">04</span></article>
+            <article className="feature-card"><span className="feature-icon"><RefreshCw size={21}/></span><div><h3>Clear transaction history</h3><p>Review wallet movements and payment records with references that help you trace each transaction.</p></div><span className="feature-index">05</span></article>
+            <article className="feature-card"><span className="feature-icon"><ShieldCheck size={21}/></span><div><h3>Account-first controls</h3><p>Keep account activity and sensitive actions behind your own authenticated workspace.</p></div><span className="feature-index">06</span></article>
+          </div>
+          <div className="feature-strip"><div className="feature-strip-icon"><BellRing size={18}/></div><div><b>Know what is happening next</b><p>We aim to show clear statuses and next steps instead of leaving you guessing.</p></div><Link className="text-link" href="/account">Open your workspace <ArrowRight size={15}/></Link></div>
+        </div>
+      </section>
+
+      <section className="faq-section" id="faq">
+        <div className="section-wrap faq-layout">
+          <div className="faq-intro"><div className="eyebrow"><span className="eyebrow-line" /> QUICK ANSWERS</div><h2>Questions, made<br/>a little simpler.</h2><p>Some useful details about using your IceyVault account and services.</p><a className="text-link" href="mailto:support@iceyvault.com">Still need help? Contact support <ArrowUpRight size={15}/></a></div>
+          <div className="faq-list">
+            {[
+              ["How do I get started?","Create an account, sign in and browse the available catalogue. Service availability, price and terms should be confirmed before you proceed to checkout."],
+              ["How do wallet deposits work?","Wallet deposits are processed through the supported payment provider. Your balance should update after the payment is verified; keep your payment reference if you need help tracing a deposit."],
+              ["Where can I track an order?","Sign in to your dashboard and open your orders. The order view is where supported status updates and incoming messages are shown."],
+              ["Are all countries and services always available?","No. Availability can change by supplier and service. IceyVault should only present an option as available after its current availability and price have been checked."],
+              ["What if a payment or order needs attention?","Keep the transaction or order reference and contact support. Never share your password, one-time codes or private payment credentials."]
+            ].map(([question, answer], index) => <article className={openFaq === index ? "faq-item open" : "faq-item"} key={question}>
+              <button type="button" className="faq-question" aria-expanded={openFaq === index} onClick={() => setOpenFaq(openFaq === index ? null : index)}><span>{question}</span>{openFaq === index ? <ChevronUp size={18}/> : <ChevronDown size={18}/>}</button>
+              {openFaq === index && <p className="faq-answer">{answer}</p>}
+            </article>)}
+          </div>
+        </div>
+      </section>
+\n      <section className="steps-section" id="how"><div className="section-wrap"><div className="center-heading"><div className="eyebrow"><span className="eyebrow-line" /> HOW IT WORKS</div><h2>Everything in three simple steps.</h2><p>A straightforward experience from choosing a service to managing your activity.</p></div>
         <div className="steps-grid"><article className="step-card"><span className="step-number">01</span><div className="step-icon"><Globe2 size={22} /></div><h3>Choose your service</h3><p>Browse available countries, platforms and number options in one organised catalogue.</p></article><article className="step-card"><span className="step-number">02</span><div className="step-icon"><Wallet size={22} /></div><h3>Fund your wallet</h3><p>When payments are enabled, add NGN funds through the supported checkout options.</p></article><article className="step-card"><span className="step-number">03</span><div className="step-icon"><Smartphone size={22} /></div><h3>Manage your activity</h3><p>Keep track of eligible orders, number status and messages from your account dashboard.</p></article></div>
       </div></section>
 
@@ -123,7 +156,7 @@ export default function Home() {
 
       <section className="cta-section" id="account"><div className="cta-card"><div className="cta-orb" /><div className="eyebrow"><Sparkles size={14} /> YOUR NEXT STEP</div><h2>Your number services,<br /><span>all in one vault.</span></h2><p>Create your account to access your personal workspace. Live payments and supplier fulfilment will be enabled after secure configuration.</p><Link className="button" href="/account">Create account <ArrowRight size={16} /></Link><small>Already registered? <Link href="/account">Log in</Link></small></div></section>
 
-      <footer className="site-footer" id="help"><div className="footer-main"><Link className="brand" href="/"><Image src="/iceyvault-logo.webp" alt="IceyVault" width={240} height={65} /></Link><p>A simpler home for supported virtual number services.</p><div className="footer-links"><a href="#services">Services</a><a href="#how">How it works</a><a href="#trust">Trust & safety</a><a href="mailto:support@iceyvault.com">Contact</a></div></div><div className="footer-bottom"><span>© {new Date().getFullYear()} IceyVault. All rights reserved.</span><span>Preview environment · Live services not yet connected</span></div></footer>
+      <footer className="site-footer" id="help"><div className="footer-main"><Link className="brand" href="/"><Image src="/iceyvault-logo.webp" alt="IceyVault" width={240} height={65} /></Link><p>A simpler home for supported virtual number services.</p><div className="footer-links"><a href="#services">Services</a><a href="#features">Features</a><a href="#how">How it works</a><a href="#faq">FAQs</a><a href="mailto:support@iceyvault.com">Contact</a></div></div><div className="footer-bottom"><span>© {new Date().getFullYear()} IceyVault. All rights reserved.</span><span>Preview environment · Live services not yet connected</span></div></footer>
     </main>
   );
 }
