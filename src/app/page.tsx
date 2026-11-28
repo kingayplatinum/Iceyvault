@@ -6,7 +6,7 @@ import Image from "next/image";
 import {
   ArrowDownToLine, ArrowRight, ArrowUpRight, BadgeCheck, Check, ChevronDown,
   CircleHelp, Globe2, Headphones, LockKeyhole, Menu, MessageCircle, Search,
-  ShieldCheck, Smartphone, Sparkles, Wallet, X, Zap, Sun, Moon, Clock3, RefreshCw, BellRing, CircleDollarSign, ChevronUp,
+  ShieldCheck, Smartphone, Sparkles, Wallet, X, Zap, Sun, Moon, Clock3, RefreshCw, BellRing, ChevronUp,
 } from "lucide-react";
 
 type Category = "All services" | "WhatsApp" | "Telegram" | "Other services" | "Rentals";
