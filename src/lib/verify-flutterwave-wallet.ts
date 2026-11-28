@@ -43,7 +43,7 @@ export async function verifyAndCreditWalletPayment(paymentId: string, providerTr
   // Flutterwave webhook payloads may contain a charge identifier that is not
   // the V3 transaction ID. Try the numeric ID first, but fall back to the
   // unique merchant tx_ref when that ID cannot be resolved by V3.
-  const numericId = suppliedId && /^\\d+$/.test(String(suppliedId)) ? String(suppliedId) : null;
+  const numericId = suppliedId && /^\d+$/.test(String(suppliedId)) ? String(suppliedId) : null;
   let verification: Awaited<ReturnType<typeof requestVerification>> | null = null;
   if (numericId) {
     verification = await requestVerification(
