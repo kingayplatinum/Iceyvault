@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import {
   LayoutDashboard, ShoppingBag, Wallet, MessageCircle, Bell, LifeBuoy, Settings, LogOut, MoreHorizontal, Users, Phone,
 } from "lucide-react";
+import DashboardMobileNav from "@/components/dashboard-mobile-nav";
 import "./workspace.css";
 
 const nav = [
@@ -66,13 +67,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <div className="workspace-content">{children}</div>
       </main>
 
-      <nav className="workspace-mobile-nav" aria-label="Mobile navigation">
-        <Link href="/dashboard/catalog"><Phone size={19}/><span>Numbers</span></Link>
-        <Link href="/dashboard/orders"><ShoppingBag size={19}/><span>Logs</span></Link>
-        <Link href="/dashboard" className="workspace-mobile-home"><span><LayoutDashboard size={22}/></span><small>Home</small></Link>
-        <Link href="/dashboard/wallet"><Wallet size={19}/><span>Wallet</span></Link>
-        <Link href="/dashboard/social"><Users size={19}/><span>Social</span></Link>
-      </nav>
+      <DashboardMobileNav />
+      <Link href="/dashboard/support" className="workspace-support-fab" aria-label="Open customer support"><LifeBuoy size={21}/></Link>
     </div>
   );
 }
