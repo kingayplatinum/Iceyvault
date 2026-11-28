@@ -11,6 +11,17 @@ type V3Transaction = {
 };
 type V3Envelope = { status?: string; message?: string; data?: V3Transaction };
 
+async function requestVerification(url: string, secretKey: string) {
+  const response = await fetch(url, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${secretKey}`, Accept: "application/json" },
+    cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
+  });
+  const payload = await response.json().catch(() => null) as V3Envelope | null;
+  return { response, payload };
+}
+
 export async function verifyAndCreditWalletPayment(paymentId: string, providerTransactionId?: string | null) {
   const service = createServiceClient();
   const { data: payment, error } = await service.from("payment_transactions")
@@ -28,26 +39,34 @@ export async function verifyAndCreditWalletPayment(paymentId: string, providerTr
 
   const secretKey = process.env.FLW_SECRET_KEY;
   if (!secretKey) throw new Error("FLW_SECRET_KEY is not configured.");
-  // The hosted checkout redirect normally includes transaction_id. If a browser
-  // closes early or a newer webhook uses a non-numeric charge ID, verify by tx_ref.
-  const numericId = suppliedId && /^\d+$/.test(String(suppliedId)) ? String(suppliedId) : null;
-  const verifyUrl = numericId
-    ? `https://api.flutterwave.com/v3/transactions/${encodeURIComponent(numericId)}/verify`
-    : `https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${encodeURIComponent(payment.gateway_reference)}`;
-  const response = await fetch(verifyUrl, {
-    method: "GET",
-    headers: { Authorization: `Bearer ${secretKey}`, Accept: "application/json" },
-    cache: "no-store",
-    signal: AbortSignal.timeout(15_000),
-  });
-  const payload = await response.json().catch(() => null) as V3Envelope | null;
+
+  // Flutterwave webhook payloads may contain a charge identifier that is not
+  // the V3 transaction ID. Try the numeric ID first, but fall back to the
+  // unique merchant tx_ref when that ID cannot be resolved by V3.
+  const numericId = suppliedId && /^\\d+$/.test(String(suppliedId)) ? String(suppliedId) : null;
+  let verification: Awaited<ReturnType<typeof requestVerification>> | null = null;
+  if (numericId) {
+    verification = await requestVerification(
+      `https://api.flutterwave.com/v3/transactions/${encodeURIComponent(numericId)}/verify`,
+      secretKey,
+    );
+  }
+
+  if (!verification || !verification.response.ok || verification.payload?.status !== "success" || !verification.payload.data) {
+    verification = await requestVerification(
+      `https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${encodeURIComponent(payment.gateway_reference)}`,
+      secretKey,
+    );
+  }
+
+  const { response, payload } = verification;
   if (!response.ok || payload?.status !== "success" || !payload.data) {
     throw new Error(payload?.message || `Flutterwave transaction verification failed (${response.status}).`);
   }
 
   const transaction = payload.data;
   if (
-    (numericId !== null && String(transaction.id) !== numericId) ||
+    (numericId !== null && String(transaction.id) !== numericId && transaction.tx_ref !== payment.gateway_reference) ||
     transaction.tx_ref !== payment.gateway_reference ||
     transaction.currency !== "NGN" ||
     !Number.isFinite(Number(transaction.amount)) ||
@@ -66,9 +85,9 @@ export async function verifyAndCreditWalletPayment(paymentId: string, providerTr
   }
 
   if (transaction.status !== "successful") {
-    if (!payment.gateway_transaction_id) await service.from("payment_transactions").update({
+    await service.from("payment_transactions").update({
       gateway_transaction_id: String(transaction.id),
-      raw_event: { provider_transaction_id: String(transaction.id), provider_status: transaction.status },
+      raw_event: { provider_transaction_id: String(transaction.id), provider_status: transaction.status, tx_ref: transaction.tx_ref },
       updated_at: new Date().toISOString(),
     }).eq("id", payment.id).eq("status", "pending");
     return { credited: false, status: "pending" };
