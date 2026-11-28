@@ -123,3 +123,45 @@
  .workspace-mobile-nav{min-height:67px}
 }
 @media(max-width:360px){.dashboard-wallet-art{display:none}.dashboard-wallet-hero{min-height:180px}}
+
+
+/* Virtual-number catalogue: searchable, easy-to-scan options */
+.workspace-number-market{display:grid;gap:17px}
+.workspace-number-modes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.workspace-number-modes button{display:grid;gap:5px;min-height:68px;padding:12px 14px;border:1px solid #e6e8ef;border-radius:13px;background:#fff;color:#4f5668;text-align:left}
+.workspace-number-modes button b{font-size:12px}
+.workspace-number-modes button small{color:#9097a6;font-size:10px}
+.workspace-number-modes button.selected{border-color:#a36be0;background:#f8f0ff;color:#8035c8;box-shadow:0 0 0 2px #9438dc12}
+.workspace-number-modes button.selected small{color:#9964c5}
+.workspace-number-filters{display:grid;grid-template-columns:minmax(160px,.55fr) minmax(0,1.45fr);gap:12px;align-items:end}
+.workspace-number-search{display:flex;align-items:center;gap:10px;min-height:45px;padding:0 13px;border:1px solid #e1e4ed;border-radius:12px;background:#fafbfe;color:#9299a8}
+.workspace-number-search:focus-within{border-color:#a16add;box-shadow:0 0 0 3px #9438dc12;background:#fff}
+.workspace-number-search input{width:100%;min-width:0;border:0;outline:0;background:transparent;color:#202438;font-size:12px}
+.workspace-number-search input::placeholder{color:#a1a7b3}
+.workspace-number-search button{border:0;background:transparent;color:#7c8493;font-size:20px}
+.workspace-number-services{display:flex;gap:8px;overflow-x:auto;padding:0 0 5px;scrollbar-width:thin}
+.workspace-number-services button{flex:0 0 auto;padding:9px 13px;border:1px solid #e5e7ef;border-radius:24px;background:#fff;color:#626b7d;font-size:11px;font-weight:700;white-space:nowrap}
+.workspace-number-services button.selected{border-color:#9438dc;background:#9438dc;color:#fff}
+.workspace-number-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.workspace-number-card{min-width:0;padding:16px;border:1px solid #e6e8ef;border-radius:15px;background:#fff;box-shadow:0 3px 13px #252c4005}
+.workspace-number-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.workspace-number-app{width:37px;height:37px;display:grid;place-items:center;border-radius:11px;background:#f4eaff;color:#9438dc}
+.workspace-number-card .workspace-product-country{margin-top:14px}
+.workspace-number-card h3{margin:5px 0;color:#252a3a;font-size:14px}
+.workspace-number-card>p{margin:0;color:#81899a;font-size:11px;line-height:1.5}
+.workspace-number-card-bottom{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:15px;padding-top:13px;border-top:1px solid #eff0f5}
+.workspace-number-card-bottom>strong{color:#8436ce;font-size:15px;white-space:nowrap}
+.workspace-number-card-bottom .workspace-primary{min-height:37px;padding:8px 11px;font-size:10px;white-space:nowrap}
+@media(max-width:760px){
+ .workspace-number-market{gap:14px}
+ .workspace-number-modes{gap:7px}
+ .workspace-number-modes button{min-height:64px;padding:10px;border-radius:12px}
+ .workspace-number-modes button b{font-size:11px}
+ .workspace-number-modes button small{font-size:9px}
+ .workspace-number-filters{grid-template-columns:1fr;gap:11px}
+ .workspace-number-search{min-height:45px}
+ .workspace-number-grid{grid-template-columns:1fr;gap:10px}
+ .workspace-number-card{padding:14px}
+ .workspace-number-card h3{font-size:13px}
+ .workspace-number-card-bottom .workspace-primary{min-width:116px}
+}
