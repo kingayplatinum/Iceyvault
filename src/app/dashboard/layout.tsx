@@ -1,4 +1,3 @@
-export const dynamic = "force-dynamic";
 import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
@@ -26,8 +25,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!user) redirect("/account?next=/dashboard");
   const { data: profile } = await supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle();
   const name = profile?.display_name || user.email?.split("@")[0] || "Customer";
-  const mobilePrimary = nav.slice(0, 4);
-  const mobileMore = nav.slice(4);
 
   return (
     <div className="workspace-shell">
@@ -48,14 +45,17 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
       <header className="workspace-mobile-header">
         <Link href="/" className="workspace-brand" aria-label="IceyVault home"><Image src="/iceyvault-logo.webp" alt="IceyVault" width={240} height={65} priority /></Link>
-        <details className="workspace-mobile-more">
-          <summary aria-label="More account options"><MoreHorizontal size={22}/></summary>
-          <div className="workspace-mobile-menu">
-            <div className="workspace-mobile-menu-user"><b>{name}</b><small>{user.email}</small></div>
-            {mobileMore.map(([label, href, Icon]) => <Link href={href} key={href}><Icon size={17}/>{label}</Link>)}
-            <form action="/auth/signout" method="post"><button><LogOut size={17}/>Sign out</button></form>
-          </div>
-        </details>
+        <div className="workspace-mobile-header-actions">
+          <Link href="/dashboard/wallet" className="workspace-mobile-balance"><Wallet size={15}/> Wallet</Link>
+          <details className="workspace-mobile-more">
+            <summary aria-label="More account options"><MoreHorizontal size={22}/></summary>
+            <div className="workspace-mobile-menu">
+              <div className="workspace-mobile-menu-user"><b>{name}</b><small>{user.email}</small></div>
+              {nav.filter(([, href]) => !["/dashboard","/dashboard/catalog","/dashboard/orders","/dashboard/wallet"].includes(href)).map(([label, href, Icon]) => <Link href={href} key={href}><Icon size={17}/>{label}</Link>)}
+              <form action="/auth/signout" method="post"><button><LogOut size={17}/>Sign out</button></form>
+            </div>
+          </details>
+        </div>
       </header>
 
       <main className="workspace-main">
@@ -67,9 +67,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
       </main>
 
       <nav className="workspace-mobile-nav" aria-label="Mobile navigation">
-        {mobilePrimary.map(([label, href, Icon]) => (
-          <Link href={href} key={href}><Icon size={19}/><span>{label === "Overview" ? "Home" : label === "Virtual numbers" ? "Numbers" : label === "My orders" ? "Orders" : label}</span></Link>
-        ))}
+        <Link href="/dashboard/catalog"><Phone size={19}/><span>Numbers</span></Link>
+        <Link href="/dashboard/orders"><ShoppingBag size={19}/><span>Logs</span></Link>
+        <Link href="/dashboard" className="workspace-mobile-home"><span><LayoutDashboard size={22}/></span><small>Home</small></Link>
+        <Link href="/dashboard/wallet"><Wallet size={19}/><span>Wallet</span></Link>
+        <Link href="/dashboard/social"><Users size={19}/><span>Social</span></Link>
       </nav>
     </div>
   );
