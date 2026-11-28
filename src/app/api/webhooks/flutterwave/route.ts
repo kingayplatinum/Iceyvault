@@ -18,12 +18,23 @@ export async function POST(request: NextRequest) {
   const signature = request.headers.get("flutterwave-signature") || "";
   const legacyHash = request.headers.get("verif-hash") || "";
 
-  if (!secretHash) return new NextResponse("Webhook secret is not configured", { status: 503 });
+  if (!secretHash) {
+    console.error("Flutterwave webhook rejected: FLW_WEBHOOK_SECRET_HASH is not configured.");
+    return new NextResponse("Webhook secret is not configured", { status: 503 });
+  }
   const expectedSignature = createHmac("sha256", secretHash).update(rawBody).digest("base64");
-  const signatureValid = signature
-    ? safeEqual(signature, expectedSignature)
-    : Boolean(legacyHash && safeEqual(legacyHash, secretHash));
-  if (!signatureValid) return new NextResponse("Unauthorized", { status: 401 });
+  // Flutterwave integrations may send either the newer HMAC signature or
+  // the legacy verif-hash. Accept either valid header if both are present.
+  const signatureValid =
+    Boolean(signature && safeEqual(signature, expectedSignature)) ||
+    Boolean(legacyHash && safeEqual(legacyHash, secretHash));
+  if (!signatureValid) {
+    console.warn("Flutterwave webhook rejected: signature mismatch.", {
+      hasFlutterwaveSignature: Boolean(signature),
+      hasLegacyVerificationHash: Boolean(legacyHash),
+    });
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
 
   let payload: {
     type?: string;
@@ -37,10 +48,15 @@ export async function POST(request: NextRequest) {
   }
   if (!payload?.data) return new NextResponse("Invalid payload", { status: 400 });
 
-  const eventType = payload.type || payload.event;
-  if (eventType !== "charge.completed") return NextResponse.json({ received: true });
-
+  const eventType = payload.event || payload.type;
   const reference = payload.data.tx_ref || payload.data.reference;
+  console.info("Flutterwave webhook received.", {
+    eventType: eventType || "unknown",
+    reference: reference || null,
+    providerTransactionId: payload.data.id == null ? null : String(payload.data.id),
+    providerStatus: payload.data.status || null,
+  });
+  if (eventType !== "charge.completed") return NextResponse.json({ received: true });
   if (!reference) return NextResponse.json({ received: true, matched: false });
 
   const providerId = payload.data.id == null ? null : String(payload.data.id);
