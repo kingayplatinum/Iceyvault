@@ -21,7 +21,23 @@ export default function Home() {
   const [country, setCountry] = useState("All countries");
   const [query, setQuery] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);\n  const [theme, setTheme] = useState<"dark" | "light">("dark");\n  const [openFaq, setOpenFaq] = useState<number | null>(0);\n\n  useEffect(() => {\n    const saved = window.localStorage.getItem("iceyvault-theme");\n    const preferred = saved === "light" || saved === "dark" ? saved : (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");\n    setTheme(preferred);\n    document.documentElement.dataset.theme = preferred;\n  }, []);\n\n  function toggleTheme() {\n    const next = theme === "dark" ? "light" : "dark";\n    setTheme(next);\n    document.documentElement.dataset.theme = next;\n    window.localStorage.setItem("iceyvault-theme", next);\n  }
+  const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem("iceyvault-theme");
+    const preferred = saved === "light" || saved === "dark" ? saved : (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+    setTheme(preferred);
+    document.documentElement.dataset.theme = preferred;
+  }, []);
+
+  function toggleTheme() {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    document.documentElement.dataset.theme = next;
+    window.localStorage.setItem("iceyvault-theme", next);
+  }
   const filtered = useMemo(() => offers.filter((offer) => {
     const categoryMatch = category === "All services" || offer.category === category;
     const countryMatch = country === "All countries" || offer.country === country;
@@ -37,7 +53,8 @@ export default function Home() {
           <Link className="brand" href="/" aria-label="IceyVault home"><Image src="/iceyvault-logo.webp" alt="IceyVault" width={240} height={65} priority /></Link>
           <nav className={mobileOpen ? "main-nav mobile-visible" : "main-nav"}>
             <a href="#services" onClick={() => setMobileOpen(false)}>Explore services</a>
-            <a href="#features" onClick={() => setMobileOpen(false)}>Features</a>\n            <a href="#how" onClick={() => setMobileOpen(false)}>How it works</a>
+            <a href="#features" onClick={() => setMobileOpen(false)}>Features</a>
+            <a href="#how" onClick={() => setMobileOpen(false)}>How it works</a>
             <a href="#trust" onClick={() => setMobileOpen(false)}>Why IceyVault</a>
             <a href="#faq" onClick={() => setMobileOpen(false)}>FAQs</a>
           </nav>
@@ -45,7 +62,8 @@ export default function Home() {
             <Link className="login-link" href="/account">Log in</Link>
             <Link className="button button-small" href="/account">Create account <ArrowRight size={15} /></Link>
           </div>
-          <button className="theme-toggle" type="button" onClick={toggleTheme} aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"} title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>{theme === "dark" ? <Sun /> : <Moon />}</button>\n          <button className="mobile-menu" aria-label="Toggle navigation" onClick={() => setMobileOpen(!mobileOpen)}>{mobileOpen ? <X /> : <Menu />}</button>
+          <button className="theme-toggle" type="button" onClick={toggleTheme} aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"} title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>{theme === "dark" ? <Sun /> : <Moon />}</button>
+          <button className="mobile-menu" aria-label="Toggle navigation" onClick={() => setMobileOpen(!mobileOpen)}>{mobileOpen ? <X /> : <Menu />}</button>
         </div>
       </header>
 
@@ -148,7 +166,8 @@ export default function Home() {
           </div>
         </div>
       </section>
-\n      <section className="steps-section" id="how"><div className="section-wrap"><div className="center-heading"><div className="eyebrow"><span className="eyebrow-line" /> HOW IT WORKS</div><h2>Everything in three simple steps.</h2><p>A straightforward experience from choosing a service to managing your activity.</p></div>
+
+      <section className="steps-section" id="how"><div className="section-wrap"><div className="center-heading"><div className="eyebrow"><span className="eyebrow-line" /> HOW IT WORKS</div><h2>Everything in three simple steps.</h2><p>A straightforward experience from choosing a service to managing your activity.</p></div>
         <div className="steps-grid"><article className="step-card"><span className="step-number">01</span><div className="step-icon"><Globe2 size={22} /></div><h3>Choose your service</h3><p>Browse available countries, platforms and number options in one organised catalogue.</p></article><article className="step-card"><span className="step-number">02</span><div className="step-icon"><Wallet size={22} /></div><h3>Fund your wallet</h3><p>When payments are enabled, add NGN funds through the supported checkout options.</p></article><article className="step-card"><span className="step-number">03</span><div className="step-icon"><Smartphone size={22} /></div><h3>Manage your activity</h3><p>Keep track of eligible orders, number status and messages from your account dashboard.</p></article></div>
       </div></section>
 
