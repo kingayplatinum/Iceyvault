@@ -445,3 +445,14 @@
  .dashboard-wallet-hero{min-height:180px}
  .social-service-grid{grid-template-columns:1fr}
 }
+
+
+/* Active tab states and persistent support access */
+.workspace-mobile-nav a.is-active:not(.workspace-mobile-home){color:#8735d5}
+.workspace-mobile-nav a.is-active:not(.workspace-mobile-home) svg{color:#8735d5}
+.workspace-mobile-nav .workspace-mobile-home.is-active>span{background:linear-gradient(145deg,#a43de8,#6e22cb)}
+.workspace-support-fab{position:fixed;right:24px;bottom:28px;z-index:45;width:54px;height:54px;display:grid;place-items:center;border:0;border-radius:50%;background:linear-gradient(145deg,#a43de8,#7627cf);color:#fff;box-shadow:0 8px 24px #7627cf45}
+.workspace-support-fab:hover{transform:translateY(-2px);box-shadow:0 11px 28px #7627cf55}
+@media(max-width:760px){
+ .workspace-support-fab{right:17px;bottom:calc(96px + env(safe-area-inset-bottom));width:52px;height:52px}
+}
