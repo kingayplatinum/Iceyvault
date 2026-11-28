@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowUpRight, CheckCircle2, Clock3, RefreshCw, ShieldCheck, Wallet, MapPin, Save, ShoppingBag } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, Clock3, RefreshCw, ShieldCheck, Wallet, Search, ShoppingBag, ChevronRight } from "lucide-react";
 
 type Profile = {
   display_name: string | null;
@@ -46,8 +46,10 @@ export default function CustomerSection({ section }: { section: string }) {
   const [saving, setSaving] = useState(false);
   const [lastOrderId, setLastOrderId] = useState<string | null>(null);
   const [catalogCountry, setCatalogCountry] = useState("US");
-  const [catalogService, setCatalogService] = useState("");
+  const [catalogService, setCatalogService] = useState("all");
   const [catalogProduct, setCatalogProduct] = useState("");
+  const [catalogQuery, setCatalogQuery] = useState("");
+  const [catalogMode, setCatalogMode] = useState("all");
 
   const catalogCountries = useMemo(() => Array.from(new Map(c.tiers.map(t => [t.country_iso2, { code: t.country_iso2, name: t.country_name || t.country_iso2 }])).values()).sort((a,b) => {
     const rank = (code: string) => code === "US" ? 0 : code === "GB" ? 1 : 2;
@@ -55,7 +57,14 @@ export default function CustomerSection({ section }: { section: string }) {
   }), [c.tiers]);
   const countryProducts = useMemo(() => c.tiers.filter(t => t.country_iso2 === catalogCountry), [c.tiers, catalogCountry]);
   const countryServices = useMemo(() => c.services.filter(s => countryProducts.some(t => t.service_id === s.id)), [c.services, countryProducts]);
-  const serviceProducts = useMemo(() => countryProducts.filter(t => t.service_id === catalogService), [countryProducts, catalogService]);
+  const serviceProducts = useMemo(() => countryProducts.filter(t => catalogService === "all" || t.service_id === catalogService), [countryProducts, catalogService]);
+  const visibleNumberProducts = useMemo(() => serviceProducts.filter(product => {
+    const isAlternative = /alternative|alt/i.test(product.tier_label);
+    const modeMatch = catalogMode === "all" || (catalogMode === "alternative" ? isAlternative : !isAlternative);
+    const serviceName = c.services.find(service => service.id === product.service_id)?.display_name || "";
+    const queryMatch = !catalogQuery.trim() || (serviceName + " " + product.tier_label + " " + (product.country_name || product.country_iso2)).toLowerCase().includes(catalogQuery.trim().toLowerCase());
+    return modeMatch && queryMatch;
+  }), [serviceProducts, catalogMode, catalogQuery, c.services]);
   const selectedCatalogProduct = c.tiers.find(t => t.id === catalogProduct) || null;
 
   async function load() {
@@ -92,8 +101,8 @@ export default function CustomerSection({ section }: { section: string }) {
     }
   }, [catalogCountries, catalogCountry]);
   useEffect(() => {
-    if (!countryServices.some(service => service.id === catalogService)) {
-      setCatalogService(countryServices[0]?.id || "");
+    if (catalogService !== "all" && !countryServices.some(service => service.id === catalogService)) {
+      setCatalogService(countryServices[0]?.id || "all");
     }
   }, [countryServices, catalogService]);
   useEffect(() => {
@@ -328,19 +337,30 @@ export default function CustomerSection({ section }: { section: string }) {
         <section className="workspace-panel">
           <div className="workspace-section-title"><div><h2>Choose your number</h2><p>Select a country, service and available supplier product. Only verified products with stock and approved retail pricing are shown.</p></div><span className="workspace-count">{c.tiers.length}</span></div>
           {loading ? <Empty text="Checking verified catalogue…"/> : c.tiers.length ? (
-            <div className="workspace-catalogue-picker">
-              <label className="workspace-field"><span>Country</span><select className="workspace-input" value={catalogCountry} onChange={e=>{setCatalogCountry(e.target.value);setCatalogService("");setCatalogProduct("");}}>{catalogCountries.map(country=><option key={country.code} value={country.code}>{country.name} ({country.code})</option>)}</select></label>
-              <label className="workspace-field"><span>Service</span><select className="workspace-input" value={catalogService} onChange={e=>{setCatalogService(e.target.value);setCatalogProduct("");}}><option value="">Choose a service</option>{countryServices.map(service=><option key={service.id} value={service.id}>{service.display_name}</option>)}</select></label>
-              <label className="workspace-field"><span>Number type / product</span><select className="workspace-input" value={catalogProduct} onChange={e=>setCatalogProduct(e.target.value)}><option value="">Choose a product</option>{serviceProducts.map(product=><option key={product.id} value={product.id}>{product.tier_label} · {money(product.retail_price_kobo)} · {product.last_inventory_count??0} in stock</option>)}</select></label>
-              {selectedCatalogProduct ? (
-                <article className="workspace-product-card workspace-selected-product">
-                  <div className="workspace-product-top"><span className="workspace-product-icon"><ShoppingBag size={19}/></span><span className="workspace-stock">{selectedCatalogProduct.last_inventory_count??0} in stock</span></div>
-                  <span className="workspace-product-country">{selectedCatalogProduct.country_name||selectedCatalogProduct.country_iso2}</span>
-                  <h3>{c.services.find(service=>service.id===selectedCatalogProduct.service_id)?.display_name||"Service"}</h3>
-                  <p>{selectedCatalogProduct.tier_label}</p>
-                  <div className="workspace-product-bottom"><strong>{money(selectedCatalogProduct.retail_price_kobo)}</strong><button className="workspace-primary" disabled={buying||(selectedCatalogProduct.last_inventory_count??0)<1} onClick={()=>void buyNumber(selectedCatalogProduct.id)}>{buying?"Processing…":"Buy number"}</button></div>
-                </article>
-              ) : <Empty text="No verified products are available for this country and service yet. Choose another option or check back after the supplier catalogue is refreshed."/>}
+            <div className="workspace-number-market">
+              <div className="workspace-number-modes" role="tablist" aria-label="Number type">
+                <button type="button" className={catalogMode === "standard" ? "selected" : ""} onClick={() => setCatalogMode("standard")}><b>Standard</b><small>{catalogCountry} only</small></button>
+                <button type="button" className={catalogMode === "alternative" ? "selected" : ""} onClick={() => setCatalogMode("alternative")}><b>Alternative</b><small>{catalogCountry} only</small></button>
+                <button type="button" className={catalogMode === "all" ? "selected" : ""} onClick={() => setCatalogMode("all")}><b>All types</b><small>Available countries</small></button>
+              </div>
+              <div className="workspace-number-filters">
+                <label className="workspace-field"><span>Country</span><select className="workspace-input" value={catalogCountry} onChange={e=>{setCatalogCountry(e.target.value);setCatalogService("all");setCatalogProduct("");}}>{catalogCountries.map(country=><option key={country.code} value={country.code}>{country.name} ({country.code})</option>)}</select></label>
+                <label className="workspace-number-search"><Search size={17}/><input value={catalogQuery} onChange={e=>setCatalogQuery(e.target.value)} placeholder="Search WhatsApp, Telegram, Google…"/>{catalogQuery?<button type="button" onClick={()=>setCatalogQuery("")} aria-label="Clear search">×</button>:null}</label>
+              </div>
+              <div className="workspace-number-services" aria-label="Popular services">
+                <button type="button" className={catalogService === "all" ? "selected" : ""} onClick={()=>setCatalogService("all")}>All services</button>
+                {countryServices.map(service=><button type="button" key={service.id} className={catalogService === service.id ? "selected" : ""} onClick={()=>setCatalogService(service.id)}>{service.display_name}</button>)}
+              </div>
+              {visibleNumberProducts.length ? <div className="workspace-number-grid">
+                {visibleNumberProducts.map(product=><article className="workspace-number-card" key={product.id}>
+                  <div className="workspace-number-card-top"><span className="workspace-number-app"><ShoppingBag size={18}/></span><span className="workspace-stock">{product.last_inventory_count ?? 0} in stock</span></div>
+                  <span className="workspace-product-country">{product.country_name || product.country_iso2}</span>
+                  <h3>{c.services.find(service=>service.id===product.service_id)?.display_name || "Service"}</h3>
+                  <p>{product.tier_label}</p>
+                  <div className="workspace-number-card-bottom"><strong>{money(product.retail_price_kobo)}</strong><button className="workspace-primary" disabled={buying || (product.last_inventory_count ?? 0) < 1} onClick={()=>{setCatalogProduct(product.id);void buyNumber(product.id);}}>{buying ? "Processing…" : "Buy now"} <ChevronRight size={15}/></button></div>
+                </article>)}
+              </div> : <Empty text="No verified numbers match these filters. Try another service or country, or check back after the supplier catalogue refreshes."/>}
+              {lastOrderId ? <p className="workspace-inline-link"><Link href={"/dashboard/orders/" + lastOrderId}>View your new order <ArrowUpRight size={15}/></Link></p> : null}
             </div>
           ) : <Empty text="No verified products are published yet. The supplier catalogue must be synced, priced and activated by an administrator first."/>}
           {lastOrderId ? <p className="workspace-inline-link"><Link href={"/dashboard/orders/" + lastOrderId}>View your new order <ArrowUpRight size={15}/></Link></p> : null}
